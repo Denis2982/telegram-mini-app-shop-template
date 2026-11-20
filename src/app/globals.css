@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-tg-bg: var(--tg-theme-bg-color, #ffffff);
+  --color-tg-text: var(--tg-theme-text-color, #111827);
+  --color-tg-hint: var(--tg-theme-hint-color, #6b7280);
+  --color-tg-link: var(--tg-theme-link-color, #2563eb);
+  --color-tg-button: var(--tg-theme-button-color, #2563eb);
+  --color-tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --color-tg-secondary: var(--tg-theme-secondary-bg-color, #f3f4f6);
+  --color-tg-section: var(--tg-theme-section-bg-color, #ffffff);
+  --color-tg-destructive: var(--tg-theme-destructive-text-color, #dc2626);
+}
+
+html,
+body {
+  background: var(--tg-theme-secondary-bg-color, #f3f4f6);
+  color: var(--tg-theme-text-color, #111827);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.sheet-up {
+  animation: sheet-up 0.22s ease-out;
+}

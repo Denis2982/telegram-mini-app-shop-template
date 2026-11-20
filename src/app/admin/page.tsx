@@ -1,0 +1,222 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { getWebApp } from "@/hooks/useTelegram";
+import type { OrderDto, ProductDto } from "@/types";
+
+type Tab = "orders" | "products" | "io";
+
+const STATUS_LABEL: Record<string, string> = {
+  new: "Новый",
+  paid: "Оплачен",
+  processing: "В сборке",
+  shipped: "Отправлен",
+  completed: "Завершён",
+  cancelled: "Отклонён",
+};
+
+export default function AdminPage() {
+  const [key, setKey] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [tab, setTab] = useState<Tab>("orders");
+  const [orders, setOrders] = useState<OrderDto[]>([]);
+  const [products, setProducts] = useState<ProductDto[]>([]);
+  const [msg, setMsg] = useState("");
+  const [sheetUrl, setSheetUrl] = useState("");
+
+  const call = useCallback(
+    async (path: string, init: RequestInit = {}, k = key) => {
+      const headers = new Headers(init.headers);
+      headers.set("x-admin-key", k);
+      const initData = getWebApp()?.initData;
+      if (initData) headers.set("Authorization", `tma ${initData}`);
+      if (init.body && typeof init.body === "string") headers.set("Content-Type", "application/json");
+      return fetch(path, { ...init, headers, cache: "no-store" });
+    },
+    [key],
+  );
+
+  const load = useCallback(
+    async (k = key) => {
+      const [o, p] = await Promise.all([call("/api/admin/orders", {}, k), call("/api/admin/products", {}, k)]);
+      if (!o.ok || !p.ok) return false;
+      setOrders(await o.json());
+      setProducts(await p.json());
+      return true;
+    },
+    [call, key],
+  );
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("admin-key") ?? "";
+    setKey(saved);
+    void load(saved).then((ok) => setAuthed(ok));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const login = async () => {
+    const ok = await load(key);
+    setAuthed(ok);
+    setMsg(ok ? "" : "Неверный ключ");
+    if (ok) sessionStorage.setItem("admin-key", key);
+  };
+
+  const act = async (id: number, action: string) => {
+    const r = await call(`/api/admin/orders/${id}`, { method: "POST", body: JSON.stringify({ action }) });
+    if (!r.ok) setMsg(`Ошибка: ${(await r.json()).error}`);
+    else setMsg("");
+    await load();
+  };
+
+  const patch = async (id: number, body: object) => {
+    await call(`/api/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    await load();
+  };
+
+  const download = async (format: "xlsx" | "csv") => {
+    const r = await call(`/api/admin/products/export?format=${format}`);
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `products.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const report = async (r: Response) => {
+    const d = await r.json();
+    if (!r.ok) return setMsg(`Ошибка: ${d.error}`);
+    setMsg(`Создано: ${d.created}, обновлено: ${d.updated}, ошибок: ${d.errors.length}${d.errors.length ? " — " + d.errors.slice(0, 3).map((e: { row: number; message: string }) => `стр.${e.row}: ${e.message}`).join("; ") : ""}`);
+    await load();
+  };
+
+  const upload = async (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    await report(await call("/api/admin/products/import", { method: "POST", body: fd }));
+  };
+
+  if (!authed) {
+    return (
+      <main className="mx-auto grid min-h-screen max-w-sm place-items-center p-6">
+        <div className="w-full space-y-3 rounded-2xl bg-white p-6 shadow">
+          <h1 className="text-xl font-bold">Админ-панель</h1>
+          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} placeholder="ADMIN_API_KEY" className="w-full rounded-xl bg-slate-100 px-4 py-3 outline-none" />
+          <button onClick={login} className="w-full rounded-xl bg-blue-600 py-3 font-semibold text-white">Войти</button>
+          {msg && <p className="text-sm text-red-600">{msg}</p>}
+          <p className="text-xs text-slate-500">В демо-режиме (без BOT_TOKEN) ключ по умолчанию: <code>admin</code></p>
+        </div>
+      </main>
+    );
+  }
+
+  const tabBtn = (t: Tab, label: string) => (
+    <button onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm ${tab === t ? "bg-blue-600 font-semibold text-white" : "bg-white"}`}>{label}</button>
+  );
+
+  return (
+    <main className="mx-auto max-w-5xl space-y-4 p-4 text-slate-900">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="mr-3 text-xl font-bold">Админ-панель</h1>
+        {tabBtn("orders", `Заказы (${orders.length})`)}
+        {tabBtn("products", `Товары (${products.length})`)}
+        {tabBtn("io", "Импорт / экспорт")}
+        <a href="/" className="ml-auto text-sm text-blue-600">← Витрина</a>
+      </div>
+      {msg && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{msg}</p>}
+
+      {tab === "orders" && (
+        <div className="space-y-3">
+          {orders.length === 0 && <p className="text-slate-500">Заказов пока нет</p>}
+          {orders.map((o) => (
+            <div key={o.id} className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <b>Заказ №{o.id}</b>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{STATUS_LABEL[o.status]} · {o.paymentStatus === "paid" ? "оплачен" : "не оплачен"} · {o.paymentMethod}</span>
+              </div>
+              <p className="text-sm text-slate-600">{o.customerName}, {o.customerPhone} — {o.deliveryMethod}: {o.address}</p>
+              <p className="text-sm">{o.items.map((i) => `${i.name}${i.variantName ? ` (${i.variantName})` : ""} × ${i.quantity}`).join("; ")}</p>
+              <p className="font-semibold">Итого: {o.total} {o.currency}</p>
+              <div className="flex flex-wrap gap-2">
+                {o.paymentStatus !== "paid" && o.status !== "cancelled" && <Btn onClick={() => act(o.id, "pay")}>💳 Подтвердить оплату</Btn>}
+                {o.status === "paid" && <Btn onClick={() => act(o.id, "processing")}>📦 В сборку</Btn>}
+                {["paid", "processing"].includes(o.status) && <Btn onClick={() => act(o.id, "shipped")}>🚚 Отправлен</Btn>}
+                {["paid", "processing", "shipped"].includes(o.status) && <Btn onClick={() => act(o.id, "completed")}>✅ Завершен</Btn>}
+                {!["completed", "cancelled"].includes(o.status) && <Btn danger onClick={() => act(o.id, "cancel")}>❌ Отклонить</Btn>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "products" && (
+        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr><th className="p-3">Артикул</th><th className="p-3">Название</th><th className="p-3">Категория</th><th className="p-3">Цена</th><th className="p-3">Остаток</th><th className="p-3">Активен</th></tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id} className="border-t border-slate-100">
+                  <td className="p-3 font-mono text-xs">{p.sku}</td>
+                  <td className="p-3">{p.name}</td>
+                  <td className="p-3">{p.categoryName ?? "—"}</td>
+                  <td className="p-3"><NumInput value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
+                  <td className="p-3">
+                    {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} (вариации)</span> : <NumInput value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
+                    {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">нет</span>}
+                  </td>
+                  <td className="p-3"><input type="checkbox" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === "io" && (
+        <div className="space-y-4">
+          <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+            <h2 className="font-semibold">Экспорт номенклатуры</h2>
+            <div className="flex gap-2"><Btn onClick={() => download("xlsx")}>⬇ XLSX</Btn><Btn onClick={() => download("csv")}>⬇ CSV</Btn></div>
+          </section>
+          <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+            <h2 className="font-semibold">Импорт из файла (XLSX / CSV)</h2>
+            <p className="text-sm text-slate-500">Колонки: SKU, Name, Category, Price, Stock, Image, Description (или Артикул, Название, Категория, Цена, Остаток, Ссылка на фото). Строки обновляются по артикулу.</p>
+            <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+          </section>
+          <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+            <h2 className="font-semibold">Импорт из Google Таблицы</h2>
+            <p className="text-sm text-slate-500">Таблица должна быть доступна по ссылке (чтение).</p>
+            <div className="flex gap-2">
+              <input value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm outline-none" />
+              <Btn onClick={async () => sheetUrl && report(await call("/api/admin/products/import", { method: "POST", body: JSON.stringify({ url: sheetUrl }) }))}>Импорт</Btn>
+            </div>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function Btn({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+  return (
+    <button onClick={onClick} className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium ${danger ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+      {children}
+    </button>
+  );
+}
+
+function NumInput({ value, onSave }: { value: number; onSave: (v: number) => void }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => setV(String(value)), [value]);
+  return (
+    <input
+      value={v}
+      inputMode="decimal"
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => Number(v) !== value && Number.isFinite(Number(v)) && onSave(Number(v))}
+      className="w-24 rounded-lg bg-slate-100 px-2 py-1 outline-none"
+    />
+  );
+}
