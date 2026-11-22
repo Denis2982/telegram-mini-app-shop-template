@@ -25,6 +25,29 @@ export function getBot(): Bot | null {
     registerOrders(b);
     registerAdmin(b);
     registerPayments(b);
+
+    // Быстрый переход в админку по команде /admin 
+    
+    b.command("admin", async (ctx) => { 
+      const adminId = process.env.ADMIN_CHAT_ID; 
+      const currentUserId = ctx.from?.id.toString(); 
+      
+      if (currentUserId !== adminId) { 
+        return ctx.reply("⛔ У вас нет прав администратора."); 
+      } 
+      
+      const appUrl = process.env.TELEGRAM_MINI_APP_URL; 
+      const adminUrl = `${appUrl}/admin`; 
+      
+      await ctx.reply("🔧 Панель администратора\n\nНажмите на кнопку ниже для перехода в админку:", { 
+        reply_markup: { 
+          inline_keyboard: [ 
+            [{ text: "⚙️ Открыть админ-панель", url: adminUrl }] 
+          ] 
+        } 
+      }); 
+    });
+
     bot = b;
     botToken = token;
   }
