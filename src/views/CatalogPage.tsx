@@ -13,11 +13,15 @@ const SORTS: SortKey[] = ["popular", "price_asc", "price_desc", "new"];
 
 export function CatalogPage({ onCart, onOrders }: { onCart: () => void; onOrders: () => void }) {
   const { t, money } = useT();
-  const { products, categories, filters, loading, error, setFilters, resetFilters } = useShopStore();
+  const { products, categories, filters, loading, error, setFilters, resetFilters, loadProducts } = useShopStore();
   const lines = useCartStore((s) => s.lines);
   const [q, setQ] = useState(filters.q);
   const [showFilters, setShowFilters] = useState(false);
   const [open, setOpen] = useState<ProductDto | null>(null);
+
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
 
   useEffect(() => {
     if (q === filters.q) return;
