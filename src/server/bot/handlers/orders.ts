@@ -21,22 +21,30 @@ export function registerOrders(bot: Bot) {
   });
 
   // Buyer uploads a payment receipt for a manual-transfer order.
-  bot.on("message:photo", async (ctx) => {
+  bot.on(["message:photo", "message:document"], async (ctx) => {
     if (ctx.chat.type !== "private" || !ctx.from) return;
     const lang = pickLocale(ctx.from.language_code);
     const user = await getUserByTgId(ctx.from.id);
     const order = user ? await findPendingManualOrder(user.id) : null;
     if (!order) return void (await ctx.reply(tr(lang, "bot.noOrderForReceipt")));
 
-    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+    const fileId = ctx.message.photo 
+    ? ctx.message.photo[ctx.message.photo.length - 1].file_id
+    : ctx.message.document?.file_id; 
+    if (!fileId) return;
+
     await attachReceipt(order.id, fileId);
     const chat = adminChat();
     if (chat !== null) {
       const full = await getOrderFull(order.id);
-      await ctx.api.sendPhoto(chat, fileId, {
-        caption: tr(null, "admin.receipt", { id: order.id }),
-        reply_markup: full ? adminKeyboard(full.order) : undefined,
-      });
+      if (ctx.message.photo) { 
+        await ctx.api.sendPhoto(chat, fileId, { 
+          caption: tr(null, "admin.receipt", { id: order.id }), reply_markup: full ? adminKeyboard(full.order) : undefined, 
+        }) 
+      } else { 
+        await ctx.api.sendDocument(chat, fileId, { 
+          caption: tr(null, "admin.receipt", { id: order.id }), reply_markup: full ? adminKeyboard(full.order) : undefined, }) 
+        }
     }
     await ctx.reply(tr(lang, "bot.receiptReceived"));
   });
