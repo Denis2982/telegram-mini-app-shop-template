@@ -27,18 +27,28 @@ export function OrderStatus({
   const [notice, setNotice] = useState("");
   const autoOpened = useRef(false);
 
-  const load = useCallback(async () => {
-    try {
-      setOrder(await api.order(id));
-    } catch {
-      /* ignore transient errors */
-    }
-  }, [id]);
+  const load = useCallback(() => api.order(id), [id])
 
   useEffect(() => {
-    void load();
-    const timer = setInterval(load, 4000);
-    return () => clearInterval(timer);
+    let active = true
+
+    const refresh = () => {
+      void load()
+        .then((nextOrder) => {
+          if (active) setOrder(nextOrder)
+        })
+        .catch(() => {
+          // При временной ошибке оставляем последний загруженный заказ.
+        })
+    }
+
+    refresh()
+    const timer = setInterval(refresh, 4000)
+
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
   }, [load]);
 
   const openInvoice = useCallback(
@@ -47,7 +57,11 @@ export function OrderStatus({
       if (!wa?.initData) return setNotice(t("order.invoiceOnlyTelegram"));
       wa.openInvoice(url, (status) => {
         if (status === "paid") haptic.success();
-        void load();
+        void load()
+          .then(setOrder)
+          .catch(() => {
+            // Оставляем последний загруженный заказ.
+          });
       });
     },
     [load, t],
@@ -56,12 +70,10 @@ export function OrderStatus({
   // Open the Stars / card invoice right after the order is created.
   useEffect(() => {
     if (payment?.type === "invoice" && !autoOpened.current) {
-      autoOpened.current = true;
-      openInvoice(payment.url);
-    } else if (payment?.type === "none" && payment.error) {
-      setNotice(t("order.paymentError"));
+      autoOpened.current = true
+      openInvoice(payment.url)
     }
-  }, [payment, openInvoice, t]);
+  }, [payment, openInvoice]);
 
   const pay = async () => {
     setNotice("");

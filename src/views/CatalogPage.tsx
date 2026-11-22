@@ -56,7 +56,7 @@ export function CatalogPage({ onCart, onOrders }: { onCart: () => void; onOrders
       {children.length > 0 && (
         <div className="no-scrollbar flex gap-2 overflow-x-auto px-3 pt-2">
           {children.map((c) => (
-            <button key={c.id} className={`${chip(filters.categoryId === c.id)} !py-1 text-xs`} onClick={() => setFilters({ categoryId: filters.categoryId === c.id ? topId : c.id })}>
+            <button key={c.id} className={`${chip(filters.categoryId === c.id)} py-1! text-xs`} onClick={() => setFilters({ categoryId: filters.categoryId === c.id ? topId : c.id })}>
               {c.name}
             </button>
           ))}
@@ -85,7 +85,7 @@ export function CatalogPage({ onCart, onOrders }: { onCart: () => void; onOrders
         {loading && products.length === 0 ? (
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-tg-bg" />
+              <div key={i} className="aspect-3/4 animate-pulse rounded-2xl bg-tg-bg" />
             ))}
           </div>
         ) : products.length === 0 && !error ? (

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebApp } from "@/hooks/useTelegram";
 import type { OrderDto, ProductDto } from "@/types";
+import Link from 'next/link'
 
 type Tab = "orders" | "products" | "io";
 
@@ -16,7 +17,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function AdminPage() {
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState("")
+  const restoreAttempted = useRef(false);
   const [authed, setAuthed] = useState(false);
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<OrderDto[]>([]);
@@ -48,11 +50,40 @@ export default function AdminPage() {
   );
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("admin-key") ?? "";
-    setKey(saved);
-    void load(saved).then((ok) => setAuthed(ok));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (restoreAttempted.current) return
+    restoreAttempted.current = true
+
+    const saved = sessionStorage.getItem("admin-key") ?? ""
+    if (!saved) return
+
+    void Promise.all([
+      call("/api/admin/orders", {}, saved),
+      call("/api/admin/products", {}, saved),
+    ]).then(async ([o, p]) => {
+      setKey(saved)
+
+      if (!o.ok || !p.ok) return
+
+      const [loadedOrders, loadedProducts] = await Promise.all([
+        o.json(),
+        p.json(),
+      ])
+
+      setOrders(loadedOrders)
+      setProducts(loadedProducts)
+      setAuthed(true)
+    })
+  }, [call])
+
+  useEffect(() => {
+    if (!authed || !key) return
+
+    const interval = setInterval(() => {
+      void load(key)
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [authed, key, load]);
 
   const login = async () => {
     const ok = await load(key);
@@ -121,7 +152,9 @@ export default function AdminPage() {
         {tabBtn("orders", `Заказы (${orders.length})`)}
         {tabBtn("products", `Товары (${products.length})`)}
         {tabBtn("io", "Импорт / экспорт")}
-        <a href="/" className="ml-auto text-sm text-blue-600">← Витрина</a>
+        <Link href="/" className="ml-auto text-sm text-blue-600">
+          ← Витрина
+        </Link>
       </div>
       {msg && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{msg}</p>}
 
@@ -161,9 +194,9 @@ export default function AdminPage() {
                   <td className="p-3 font-mono text-xs">{p.sku}</td>
                   <td className="p-3">{p.name}</td>
                   <td className="p-3">{p.categoryName ?? "—"}</td>
-                  <td className="p-3"><NumInput value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
+                  <td className="p-3"><NumInput key={`price-${p.id}-${p.price}`} value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
                   <td className="p-3">
-                    {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} (вариации)</span> : <NumInput value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
+                    {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} (вариации)</span> : <NumInput key={`stock-${p.id}-${p.stock}`} value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
                     {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">нет</span>}
                   </td>
                   <td className="p-3"><input type="checkbox" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
@@ -208,8 +241,7 @@ function Btn({ children, onClick, danger }: { children: React.ReactNode; onClick
 }
 
 function NumInput({ value, onSave }: { value: number; onSave: (v: number) => void }) {
-  const [v, setV] = useState(String(value));
-  useEffect(() => setV(String(value)), [value]);
+  const [v, setV] = useState(String(value));  
   return (
     <input
       value={v}

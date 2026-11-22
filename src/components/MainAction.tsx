@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { isInTelegram, useMainButton } from "@/hooks/useTelegram";
 
 interface Props {
@@ -11,14 +11,20 @@ interface Props {
   onClick: () => void;
 }
 
+const subscribeToTelegram = () => () => { }
+const getServerNativeSnapshot = () => true;
+
 /** Uses Telegram's native MainButton inside Telegram, and a fixed bottom button in a regular browser. */
 export function MainAction({ text, visible = true, disabled, loading, onClick }: Props) {
   useMainButton({ text, visible, disabled, loading, onClick });
-  const [native, setNative] = useState(true);
-  useEffect(() => setNative(isInTelegram()), []);
+  const native = useSyncExternalStore(
+    subscribeToTelegram,
+    isInTelegram,
+    getServerNativeSnapshot,
+  );
   if (native || !visible) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[60] mx-auto max-w-xl p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-60 mx-auto max-w-xl p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <button
         onClick={onClick}
         disabled={disabled || loading}

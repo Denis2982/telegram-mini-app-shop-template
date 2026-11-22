@@ -16,7 +16,7 @@ type View =
   | { name: "order"; id: number; payment?: PaymentInstruction };
 
 export function App() {
-  const [mounted, setMounted] = useState(false);
+  
   const [stack, setStack] = useState<View[]>([{ name: "catalog" }]);
   const config = useShopStore((s) => s.config);
   const error = useShopStore((s) => s.error);
@@ -24,7 +24,7 @@ export function App() {
 
   useEffect(() => {
     initTelegram();
-    setMounted(true);
+    
     void init(getWebApp()?.initDataUnsafe?.user?.language_code);
   }, [init]);
 
@@ -38,7 +38,7 @@ export function App() {
     if (config) document.title = config.storeName;
   }, [config]);
 
-  if (!mounted || !config) {
+  if (!config) {
     return (
       <div className="grid min-h-screen place-items-center text-tg-hint">
         {error ? <p className="px-6 text-center">{error}</p> : <div className="h-8 w-8 animate-spin rounded-full border-4 border-tg-button border-t-transparent" />}
