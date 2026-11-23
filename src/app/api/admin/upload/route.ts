@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 import { fail, json, withAdmin } from "@/server/http";
 
 export const runtime = "nodejs";
@@ -27,9 +28,31 @@ export const POST = withAdmin(async (req) => {
   if (!type.matches(data)) return fail("File content does not match its image type");
 
   const filename = `${randomUUID()}.${type.extension}`;
+  if (process.env.VERCEL === "1") {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return fail("Image storage is not configured. Connect a Vercel Blob store.", 503);
+    }
+    try {
+      const blob = await put(filename, data, {
+        access: "public",
+        addRandomSuffix: false,
+        contentType: file.type,
+      });
+      return json({ url: blob.url });
+    } catch (error) {
+      console.error("Could not upload product image to Vercel Blob", error);
+      return fail("Could not upload image to Vercel Blob", 502);
+    }
+  }
+
   const uploadDirectory = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadDirectory, { recursive: true });
-  await writeFile(path.join(uploadDirectory, filename), data, { flag: "wx" });
+  try {
+    await mkdir(uploadDirectory, { recursive: true });
+    await writeFile(path.join(uploadDirectory, filename), data, { flag: "wx" });
+  } catch (error) {
+    console.error("Could not save uploaded product image", error);
+    return fail("Image storage is unavailable; the server cannot write to its uploads directory", 503);
+  }
 
   return json({ url: `/uploads/${filename}` });
 });

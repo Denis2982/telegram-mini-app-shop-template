@@ -99,10 +99,11 @@ export default function AdminPage() {
     await load();
   };
 
-  const patch = async (id: number, body: object) => {
+  const patch = async (id: number, body: object, context?: string) => {
     const r = await call(`/api/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
     if (!r.ok) {
-      setMsg(`Ошибка: ${(await r.json()).error}`);
+      const error = await r.json().catch(() => ({ error: "Internal error" }));
+      setMsg(context ? `${context}: ${error.error}` : `Ошибка: ${error.error}`);
       return false;
     }
     setMsg("");
@@ -117,12 +118,12 @@ export default function AdminPage() {
       const response = await call("/api/admin/upload", { method: "POST", body: formData });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: "Не удалось загрузить фото" }));
-        setMsg(`Ошибка: ${error.error ?? "Не удалось загрузить фото"}`);
+        setMsg(`Не удалось загрузить фото: ${error.error ?? "Неизвестная ошибка"}`);
         return null;
       }
       const { url } = (await response.json()) as { url: string };
       const images = [url, ...product.images.slice(1)];
-      return (await patch(product.id, { images })) ? url : null;
+      return (await patch(product.id, { images }, "Фото загружено, но не удалось сохранить его у товара")) ? url : null;
     } catch (error) {
       console.error("Product image upload failed", error);
       setMsg("Ошибка: не удалось загрузить фото");
