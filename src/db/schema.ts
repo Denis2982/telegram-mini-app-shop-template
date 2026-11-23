@@ -132,6 +132,15 @@ export const orderItems = pgTable(
   (t) => [index("order_items_order_idx").on(t.orderId)],
 );
 
+export const storeSettings = pgTable("store_settings", {
+  key: text("key").primaryKey(),
+  manualPaymentDetails: text("manual_payment_details"),
+  pickupPoints: text("pickup_points").array(),
+  currencyCode: text("currency_code"),
+  currencySymbol: text("currency_symbol"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export type DbUser = typeof users.$inferSelect;
 export type DbOrder = typeof orders.$inferSelect;
 export type DbOrderItem = typeof orderItems.$inferSelect;

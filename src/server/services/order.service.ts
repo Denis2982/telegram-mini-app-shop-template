@@ -12,11 +12,12 @@ import {
   type DbUser,
 } from "@/db/schema";
 import type { CreateOrderInput, OrderDto } from "@/types";
-import { availablePaymentMethods, deliveryFeeFor, getConfig } from "../config";
+import { availablePaymentMethods, deliveryFeeFor } from "../config";
 import { notifyBuyer, postAdminCard, refreshAdminCard } from "../bot/notify";
 import { HttpError } from "../http";
 import { adjustStock } from "./product.service";
 import { getProvider } from "./payment";
+import { getEffectiveConfig } from "./store-settings.service";
 
 export type OrderAction = "pay" | "processing" | "shipped" | "completed" | "cancel";
 
@@ -103,7 +104,7 @@ export async function computePromo(code: string | undefined, subtotal: number) {
 }
 
 export async function createOrder(user: DbUser, input: CreateOrderInput) {
-  const cfg = getConfig();
+  const cfg = await getEffectiveConfig();
   if (!availablePaymentMethods(cfg).includes(input.paymentMethod)) throw new HttpError("Payment method unavailable");
   if (!["courier", "pickup", "post"].includes(input.deliveryMethod)) throw new HttpError("Invalid delivery method");
   const name = (input.name ?? "").trim().slice(0, 120);
@@ -218,7 +219,8 @@ export async function createOrder(user: DbUser, input: CreateOrderInput) {
 }
 
 export async function createPayment(order: DbOrder, items: DbOrderItem[], user: DbUser) {
-  const provider = getProvider(order.paymentMethod);
+  const cfg = await getEffectiveConfig();
+  const provider = getProvider(order.paymentMethod, cfg);
   if (!provider) return { type: "none" as const, error: "provider_unavailable" };
   try {
     return await provider.createPayment({ order, items, user });

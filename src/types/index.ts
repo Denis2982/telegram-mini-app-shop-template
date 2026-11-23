@@ -88,6 +88,13 @@ export interface ClientConfig {
   isDevAuth: boolean;
 }
 
+export interface StoreSettingsDto {
+  manualDetails: string;
+  pickupPoints: string[];
+  currencyCode: string;
+  currencySymbol: string;
+}
+
 export interface CreateOrderInput {
   items: { productId: number; variantId?: number | null; quantity: number }[];
   deliveryMethod: DeliveryMethod;

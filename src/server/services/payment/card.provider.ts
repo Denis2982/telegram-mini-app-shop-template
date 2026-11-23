@@ -1,6 +1,7 @@
 import type { PaymentInstruction } from "@/types";
 import { getApi } from "../../bot/notify";
 import { getConfig } from "../../config";
+import { getEffectiveConfig } from "../store-settings.service";
 import { tr } from "../../locale";
 import type { IPaymentProvider, PaymentContext } from "./payment.interface";
 
@@ -16,7 +17,7 @@ export class CardProvider implements IPaymentProvider {
   async createPayment({ order, user }: PaymentContext): Promise<PaymentInstruction> {
     const api = getApi();
     if (!api) return { type: "none", error: "bot_not_configured" };
-    const cfg = getConfig();
+    const cfg = await getEffectiveConfig();
     const title = tr(user.languageCode, "bot.invoiceTitle", { id: order.id });
     const desc = tr(user.languageCode, "bot.invoiceDescription", { id: order.id, store: cfg.storeName });
     const url = await api.createInvoiceLink(title, desc, `order:${order.id}`, cfg.paymentProviderToken, cfg.currencyCode, [

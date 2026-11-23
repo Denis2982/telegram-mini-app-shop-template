@@ -8,6 +8,13 @@
       "when": 1795284695563,
       "tag": "0000_red_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795457659876,
+      "tag": "0001_amusing_pride",
+      "breakpoints": true
     }
   ]
 }

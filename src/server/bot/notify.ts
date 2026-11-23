@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { orders, type DbOrder, type DbOrderItem, type DbUser } from "@/db/schema";
 import { formatMoney, getConfig } from "../config";
 import { tr, trDefault } from "../locale";
+import { getEffectiveConfig } from "../services/store-settings.service";
 
 let api: Api | null = null;
 let apiToken = "";
@@ -46,8 +47,8 @@ export function adminKeyboard(order: Pick<DbOrder, "id" | "status" | "paymentMet
   return kb;
 }
 
-export function adminCardText(order: DbOrder, items: DbOrderItem[], user: DbUser | null) {
-  const cfg = getConfig();
+export async function adminCardText(order: DbOrder, items: DbOrderItem[], user: DbUser | null) {
+  const cfg = await getEffectiveConfig();
   const t = trDefault;
   const lines: string[] = [t("admin.newOrder", { id: order.id, status: esc(t(`status.${order.status}`)) })];
   const uname = order.customerUsername ? `(@${esc(order.customerUsername)})` : "";
@@ -80,7 +81,7 @@ export async function postAdminCard(order: DbOrder, items: DbOrderItem[], user: 
   const chat = adminChat();
   if (!a || chat === null) return;
   try {
-    const msg = await a.sendMessage(chat, adminCardText(order, items, user), {
+    const msg = await a.sendMessage(chat, await adminCardText(order, items, user), {
       parse_mode: "HTML",
       reply_markup: adminKeyboard(order),
     });
@@ -95,7 +96,7 @@ export async function refreshAdminCard(order: DbOrder, items: DbOrderItem[], use
   const chat = adminChat();
   if (!a || chat === null || !order.adminMessageId) return;
   try {
-    await a.editMessageText(chat, order.adminMessageId, adminCardText(order, items, user), {
+    await a.editMessageText(chat, order.adminMessageId, await adminCardText(order, items, user), {
       parse_mode: "HTML",
       reply_markup: adminKeyboard(order),
     });
@@ -110,11 +111,12 @@ export async function notifyBuyer(order: DbOrder, user: DbUser | null) {
   const a = getApi();
   if (!a || !user) return;
   try {
+    const cfg = await getEffectiveConfig();
     await a.sendMessage(
       user.tgId,
       tr(user.languageCode, `bot.notify.${order.status}`, {
         id: order.id,
-        total: formatMoney(order.total),
+        total: formatMoney(order.total, cfg),
       }),
     );
   } catch (e) {

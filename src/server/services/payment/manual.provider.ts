@@ -2,6 +2,7 @@ import type { PaymentInstruction } from "@/types";
 import { getApi } from "../../bot/notify";
 import { formatMoney, getConfig } from "../../config";
 import { tr } from "../../locale";
+import { getEffectiveConfig } from "../store-settings.service";
 import { esc } from "../../bot/notify";
 import type { IPaymentProvider, PaymentContext } from "./payment.interface";
 
@@ -14,7 +15,7 @@ export class ManualProvider implements IPaymentProvider {
   }
 
   async createPayment({ order, user }: PaymentContext): Promise<PaymentInstruction> {
-    const cfg = getConfig();
+    const cfg = await getEffectiveConfig();
     const details = cfg.manualDetails.replace(/\\n/g, "\n");
     const api = getApi();
     if (api && user.tgId > 1) {

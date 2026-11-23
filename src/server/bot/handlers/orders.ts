@@ -3,6 +3,7 @@ import { formatMoney, pickLocale } from "../../config";
 import { tr } from "../../locale";
 import { getUserByTgId } from "../../auth";
 import { listUserOrders } from "../../services/order.service";
+import { getEffectiveConfig } from "../../services/store-settings.service";
 import { adminChat, adminKeyboard, esc } from "../notify";
 import { attachReceipt, findPendingManualOrder, getOrderFull } from "../../services/order.service";
 
@@ -12,9 +13,10 @@ export function registerOrders(bot: Bot) {
     const user = ctx.from ? await getUserByTgId(ctx.from.id) : null;
     const list = user ? await listUserOrders(user.id, 10) : [];
     if (!list.length) return void (await ctx.reply(tr(lang, "bot.myOrdersEmpty")));
+    const cfg = await getEffectiveConfig();
     const lines = list.map(
       (o) =>
-        `<b>№${o.id}</b> · ${esc(tr(lang, `status.${o.status}`))} · ${formatMoney(o.total)}\n` +
+        `<b>№${o.id}</b> · ${esc(tr(lang, `status.${o.status}`))} · ${formatMoney(o.total, cfg)}\n` +
         o.items.map((i) => `   ${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} × ${i.quantity}`).join("\n"),
     );
     await ctx.reply(`${tr(lang, "bot.myOrdersTitle")}\n\n${lines.join("\n\n")}`, { parse_mode: "HTML" });

@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebApp } from "@/hooks/useTelegram";
-import type { OrderDto, ProductDto } from "@/types";
+import type { OrderDto, ProductDto, StoreSettingsDto } from "@/types";
 import Link from 'next/link'
 
-type Tab = "orders" | "products" | "io";
+type Tab = "orders" | "products" | "io" | "settings";
 
 const STATUS_LABEL: Record<string, string> = {
   new: "Новый",
@@ -26,6 +26,14 @@ export default function AdminPage() {
   const [msg, setMsg] = useState("");
   const [sheetUrl, setSheetUrl] = useState("");
   const [importFileName, setImportFileName] = useState("");
+  const [settingsForm, setSettingsForm] = useState({
+    manualDetails: "",
+    pickupPoints: "",
+    currencyCode: "RUB",
+    currencySymbol: "₽",
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
   const call = useCallback(
     async (path: string, init: RequestInit = {}, k = key) => {
@@ -46,6 +54,36 @@ export default function AdminPage() {
       setOrders(await o.json());
       setProducts(await p.json());
       return true;
+    },
+    [call, key],
+  );
+
+  const loadSettings = useCallback(
+    async (k = key) => {
+      setSettingsLoading(true);
+      try {
+        const response = await call("/api/admin/settings", {}, k);
+        const data = await response.json();
+        if (!response.ok) {
+          setMsg(`Ошибка: ${data.error}`);
+          return false;
+        }
+        const settings = data as StoreSettingsDto;
+        setSettingsForm({
+          manualDetails: settings.manualDetails,
+          pickupPoints: settings.pickupPoints.join("\n"),
+          currencyCode: settings.currencyCode,
+          currencySymbol: settings.currencySymbol,
+        });
+        setMsg("");
+        return true;
+      } catch (error) {
+        console.error("Could not load store settings", error);
+        setMsg("Не удалось загрузить настройки магазина");
+        return false;
+      } finally {
+        setSettingsLoading(false);
+      }
     },
     [call, key],
   );
@@ -110,6 +148,39 @@ export default function AdminPage() {
     setMsg("");
     await load();
     return true;
+  };
+
+  const saveStoreSettings = async () => {
+    setSettingsSaving(true);
+    try {
+      const response = await call("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          manualDetails: settingsForm.manualDetails,
+          pickupPoints: settingsForm.pickupPoints.split(/\r?\n/).map((point) => point.trim()).filter(Boolean),
+          currencyCode: settingsForm.currencyCode,
+          currencySymbol: settingsForm.currencySymbol,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMsg(`Ошибка: ${data.error}`);
+        return;
+      }
+      const saved = data as StoreSettingsDto;
+      setSettingsForm({
+        manualDetails: saved.manualDetails,
+        pickupPoints: saved.pickupPoints.join("\n"),
+        currencyCode: saved.currencyCode,
+        currencySymbol: saved.currencySymbol,
+      });
+      setMsg("Настройки магазина сохранены");
+    } catch (error) {
+      console.error("Could not save store settings", error);
+      setMsg("Не удалось сохранить настройки магазина");
+    } finally {
+      setSettingsSaving(false);
+    }
   };
 
   const uploadProductImage = async (product: ProductDto, file: File) => {
@@ -184,7 +255,15 @@ export default function AdminPage() {
   }
 
   const tabBtn = (t: Tab, label: string) => (
-    <button onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm ${tab === t ? "bg-blue-600 font-semibold text-white" : "bg-white"}`}>{label}</button>
+    <button
+      onClick={() => {
+        setTab(t);
+        if (t === "settings") void loadSettings();
+      }}
+      className={`cursor-pointer rounded-full px-4 py-2 text-sm ${tab === t ? "bg-blue-600 font-semibold text-white" : "bg-white"}`}
+    >
+      {label}
+    </button>
   );
 
   return (
@@ -194,7 +273,8 @@ export default function AdminPage() {
         {tabBtn("orders", `Заказы (${orders.length})`)}
         {tabBtn("products", `Товары (${products.length})`)}
         {tabBtn("io", "Импорт / экспорт")}
-        <Link href="/" className="ml-auto text-sm text-blue-600">
+        {tabBtn("settings", "Настройки магазина")}
+        <Link href="/" className="ml-auto cursor-pointer text-sm text-blue-600">
           ← Витрина
         </Link>
       </div>
@@ -297,6 +377,62 @@ export default function AdminPage() {
           </section>
         </div>
       )}
+
+      {tab === "settings" && (
+        <section className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
+          <div>
+            <h2 className="font-semibold">Настройки магазина</h2>
+            <p className="mt-1 text-sm text-slate-500">Значения сохраняются в базе данных и заменяют настройки из .env.</p>
+          </div>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">Реквизиты для ручной оплаты</span>
+            <textarea
+              value={settingsForm.manualDetails}
+              onChange={(event) => setSettingsForm({ ...settingsForm, manualDetails: event.target.value })}
+              rows={5}
+              maxLength={5000}
+              placeholder="Название банка, номер карты или счёта, получатель"
+              className="w-full resize-y rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">Адрес самовывоза</span>
+            <span className="block text-xs text-slate-500">Каждый пункт самовывоза укажите с новой строки.</span>
+            <textarea
+              value={settingsForm.pickupPoints}
+              onChange={(event) => setSettingsForm({ ...settingsForm, pickupPoints: event.target.value })}
+              rows={4}
+              placeholder="Адрес и часы работы"
+              className="w-full resize-y rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1.5">
+              <span className="block text-sm font-medium">Код валюты</span>
+              <input
+                value={settingsForm.currencyCode}
+                onChange={(event) => setSettingsForm({ ...settingsForm, currencyCode: event.target.value.toUpperCase() })}
+                maxLength={3}
+                placeholder="RUB"
+                className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-sm font-medium">Обозначение валюты</span>
+              <input
+                value={settingsForm.currencySymbol}
+                onChange={(event) => setSettingsForm({ ...settingsForm, currencySymbol: event.target.value })}
+                maxLength={8}
+                placeholder="₽"
+                className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+              />
+            </label>
+          </div>
+          <Btn onClick={saveStoreSettings} disabled={settingsLoading || settingsSaving}>
+            {settingsLoading ? "Загрузка…" : settingsSaving ? "Сохранение…" : "Сохранить настройки"}
+          </Btn>
+        </section>
+      )}
     </main>
   );
 }
@@ -381,9 +517,9 @@ function ProductImageEditor({
   );
 }
 
-function Btn({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+function Btn({ children, onClick, danger, disabled }: { children: React.ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button onClick={onClick} className={`shrink-0 cursor-pointer rounded-xl px-3.5 py-2 text-sm font-medium ${danger ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+    <button onClick={onClick} disabled={disabled} className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${disabled ? "" : "cursor-pointer"} ${danger ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
       {children}
     </button>
   );
