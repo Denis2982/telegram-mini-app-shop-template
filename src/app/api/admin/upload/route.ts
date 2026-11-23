@@ -41,6 +41,9 @@ export const POST = withAdmin(async (req) => {
       return json({ url: blob.url });
     } catch (error) {
       console.error("Could not upload product image to Vercel Blob", error);
+      if (error instanceof Error && error.message.includes("Cannot use public access on a private store")) {
+        return fail("Product images require a Public Vercel Blob Store. Create or connect a store with Public access.", 400);
+      }
       return fail("Could not upload image to Vercel Blob", 502);
     }
   }
