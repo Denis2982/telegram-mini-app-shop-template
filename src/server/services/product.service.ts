@@ -102,11 +102,15 @@ export async function getProduct(id: number): Promise<ProductDto | null> {
   return (await hydrate([row]))[0];
 }
 
-export async function updateProductAdmin(id: number, patch: { stock?: number; price?: number; active?: boolean }) {
+export async function updateProductAdmin(
+  id: number,
+  patch: { stock?: number; price?: number; active?: boolean; images?: string[] },
+) {
   const set: Partial<typeof products.$inferInsert> = { updatedAt: new Date() };
   if (patch.stock !== undefined) set.stock = Math.max(0, Math.floor(patch.stock));
   if (patch.price !== undefined && patch.price >= 0) set.price = patch.price;
   if (patch.active !== undefined) set.active = patch.active;
+  if (patch.images !== undefined) set.images = patch.images;
   await db.update(products).set(set).where(eq(products.id, id));
 }
 

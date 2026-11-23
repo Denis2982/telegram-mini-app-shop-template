@@ -100,8 +100,34 @@ export default function AdminPage() {
   };
 
   const patch = async (id: number, body: object) => {
-    await call(`/api/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    const r = await call(`/api/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    if (!r.ok) {
+      setMsg(`Ошибка: ${(await r.json()).error}`);
+      return false;
+    }
+    setMsg("");
     await load();
+    return true;
+  };
+
+  const uploadProductImage = async (product: ProductDto, file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await call("/api/admin/upload", { method: "POST", body: formData });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Не удалось загрузить фото" }));
+        setMsg(`Ошибка: ${error.error ?? "Не удалось загрузить фото"}`);
+        return null;
+      }
+      const { url } = (await response.json()) as { url: string };
+      const images = [url, ...product.images.slice(1)];
+      return (await patch(product.id, { images })) ? url : null;
+    } catch (error) {
+      console.error("Product image upload failed", error);
+      setMsg("Ошибка: не удалось загрузить фото");
+      return null;
+    }
   };
 
   const download = async (format: "xlsx" | "csv") => {
@@ -203,12 +229,19 @@ export default function AdminPage() {
         <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
-              <tr><th className="p-3">Артикул</th><th className="p-3">Название</th><th className="p-3">Категория</th><th className="p-3">Цена</th><th className="p-3">Остаток</th><th className="p-3">Активен</th></tr>
+              <tr><th className="p-3">Артикул</th><th className="p-3">Фото</th><th className="p-3">Название</th><th className="p-3">Категория</th><th className="p-3">Цена</th><th className="p-3">Остаток</th><th className="p-3">Активен</th></tr>
             </thead>
             <tbody>
               {products.map((p) => (
                 <tr key={p.id} className="border-t border-slate-100">
                   <td className="p-3 font-mono text-xs">{p.sku}</td>
+                  <td className="min-w-64 p-3">
+                    <ProductImageEditor
+                      product={p}
+                      onSaveUrl={(url) => patch(p.id, { images: url ? [url, ...p.images.slice(1)] : p.images.slice(1) })}
+                      onUpload={(file) => uploadProductImage(p, file)}
+                    />
+                  </td>
                   <td className="p-3">{p.name}</td>
                   <td className="p-3">{p.categoryName ?? "—"}</td>
                   <td className="p-3"><NumInput key={`price-${p.id}-${p.price}`} value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
@@ -246,6 +279,86 @@ export default function AdminPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function ProductImageEditor({
+  product,
+  onSaveUrl,
+  onUpload,
+}: {
+  product: ProductDto;
+  onSaveUrl: (url: string) => Promise<boolean>;
+  onUpload: (file: File) => Promise<string | null>;
+}) {
+  const currentImage = product.images[0] ?? "";
+  const [draftImage, setDraftImage] = useState({ base: currentImage, value: currentImage });
+  const [failedUrl, setFailedUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const imageUrl = draftImage.base === currentImage ? draftImage.value : currentImage;
+  const previewFailed = imageUrl !== "" && failedUrl === imageUrl;
+
+  const selectFile = async (file?: File) => {
+    if (!file) return;
+    setUploading(true);
+    const url = await onUpload(file);
+    if (url) {
+      setDraftImage({ base: currentImage, value: url });
+      setFailedUrl("");
+    }
+    setUploading(false);
+    if (fileInput.current) fileInput.current.value = "";
+  };
+
+  return (
+    <div className="flex min-w-56 items-center gap-2">
+      {imageUrl && !previewFailed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt={`Фото товара ${product.name}`}
+          onError={() => setFailedUrl(imageUrl)}
+          className="h-12 w-12 shrink-0 rounded-lg bg-slate-100 object-cover"
+        />
+      ) : (
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-slate-100 text-xl" aria-label="Фото отсутствует">
+          📷
+        </div>
+      )}
+      <div className="min-w-0 flex-1 space-y-1">
+        <input
+          type="url"
+          value={imageUrl}
+          onChange={(event) => {
+            setDraftImage({ base: currentImage, value: event.target.value });
+            setFailedUrl("");
+          }}
+          onBlur={() => {
+            const nextUrl = imageUrl.trim();
+            if (nextUrl !== (product.images[0] ?? "")) void onSaveUrl(nextUrl);
+          }}
+          placeholder="URL фото"
+          aria-label={`URL фото товара ${product.name}`}
+          className="w-full rounded-lg bg-slate-100 px-2 py-1 text-xs outline-none"
+        />
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(event) => void selectFile(event.target.files?.[0])}
+        />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileInput.current?.click()}
+          className="text-left text-xs font-medium text-blue-700 disabled:opacity-50"
+        >
+          {uploading ? "Загрузка…" : imageUrl && !previewFailed ? "📷 Заменить фото" : "📷 Добавить фото"}
+        </button>
+      </div>
+    </div>
   );
 }
 

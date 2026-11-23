@@ -22,8 +22,11 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
+    volumes:
+      - uploads:/app/public/uploads
     ports:
       - "3000:3000"
 
 volumes:
   pgdata:
+  uploads:
