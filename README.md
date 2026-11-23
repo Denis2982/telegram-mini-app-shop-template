@@ -25,7 +25,7 @@ curl -X POST https://shop.example.com/api/telegram/setup -H "x-admin-key: $ADMIN
 ## Демо-режим
 Без `BOT_TOKEN` магазин работает в браузере: авторизация — демо-пользователь, доступна оплата «по реквизитам»,
 админка `/admin` (ключ по умолчанию `admin`). Демо-товары создаются автоматически (`SEED_DEMO_DATA=false` отключает).
-Промокоды: `WELCOME10` (−10%), `MINUS500` (−500).
+Промокоды создаются и управляются в `/admin` → «Промокоды».
 
 ## Структура
 ```
@@ -35,7 +35,7 @@ src/server/auth.ts                  проверка подписи Telegram ini
 src/server/services/                product / order / excel + payment/{IPaymentProvider, stars, card, manual}
 src/server/bot/                     grammY: /start, /my_orders, /chatid, кнопки менеджеров, платежи, чеки
 src/app/api/*                       REST: config, categories, products, orders, promo, admin/*, telegram/*
-src/app/admin                       веб-админка: заказы, остатки, импорт/экспорт XLSX/CSV/Google Sheets
+src/app/admin                       веб-админка: заказы, товары, промокоды, настройки, импорт/экспорт
 src/components, src/views           интерфейс Mini App (MainButton/BackButton/Haptic через Telegram WebApp SDK)
 src/store                           Zustand: корзина (persist) и каталог/фильтры
 src/locales/{ru,en}.json            тексты интерфейса и бота
@@ -58,4 +58,4 @@ Stars включаются `TELEGRAM_STARS_ENABLED=true` (курс — `STARS_PE
 
 ## Настройки магазина
 Раздел `/admin` → «Настройки магазина» позволяет изменить реквизиты ручной оплаты, адреса самовывоза и валюту. Значения сохраняются в таблице `store_settings` и переопределяют соответствующие значения `.env`.
-Docker применяет схему базы при запуске. Для уже работающей базы на Vercel после обновления выполните `npx drizzle-kit push --url "$DATABASE_URL"` один раз, чтобы создать новую таблицу.
+Docker применяет схему базы при запуске. Для уже работающей базы после обновления перейдите в корень проекта, убедитесь, что `DATABASE_URL` в `.env` указывает на нужную базу, и выполните `npx drizzle-kit push` один раз. В Vercel можно сначала скачать переменные окружения проекта в локальный `.env` через Vercel CLI (`vercel env pull .env.local`), затем применить схему командой `npx drizzle-kit push`.

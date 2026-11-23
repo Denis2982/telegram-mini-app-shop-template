@@ -1,6 +1,6 @@
 import { count } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, productVariants, products, promoCodes } from "@/db/schema";
+import { categories, productVariants, products } from "@/db/schema";
 import { getConfig } from "./config";
 
 const px = (id: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=800`;
@@ -137,9 +137,4 @@ async function run() {
       await db.insert(productVariants).values(variants.map((v) => ({ ...v, productId: row.id })));
     }
   }
-
-  await db.insert(promoCodes).values([
-    { code: "WELCOME10", percent: 10 },
-    { code: "MINUS500", amount: 500 },
-  ]).onConflictDoNothing();
 }

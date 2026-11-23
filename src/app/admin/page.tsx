@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebApp } from "@/hooks/useTelegram";
-import type { OrderDto, ProductDto, StoreSettingsDto } from "@/types";
+import type { OrderDto, ProductDto, PromoCodeDto, PromoDiscountType, StoreSettingsDto } from "@/types";
 import Link from 'next/link'
 
-type Tab = "orders" | "products" | "io" | "settings";
+type Tab = "orders" | "products" | "io" | "promos" | "settings";
 
 const STATUS_LABEL: Record<string, string> = {
   new: "Новый",
@@ -34,6 +34,15 @@ export default function AdminPage() {
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [promos, setPromos] = useState<PromoCodeDto[]>([]);
+  const [promosLoading, setPromosLoading] = useState(false);
+  const [editingPromoCode, setEditingPromoCode] = useState<string | null>(null);
+  const [promoForm, setPromoForm] = useState({
+    code: "",
+    discountType: "percent" as PromoDiscountType,
+    value: "",
+    active: true,
+  });
 
   const call = useCallback(
     async (path: string, init: RequestInit = {}, k = key) => {
@@ -83,6 +92,29 @@ export default function AdminPage() {
         return false;
       } finally {
         setSettingsLoading(false);
+      }
+    },
+    [call, key],
+  );
+
+  const loadPromos = useCallback(
+    async (k = key) => {
+      setPromosLoading(true);
+      try {
+        const response = await call("/api/admin/promos", {}, k);
+        const data = await response.json();
+        if (!response.ok) {
+          setMsg(`Ошибка: ${data.error}`);
+          return false;
+        }
+        setPromos(data as PromoCodeDto[]);
+        return true;
+      } catch (error) {
+        console.error("Could not load promo codes", error);
+        setMsg("Не удалось загрузить промокоды");
+        return false;
+      } finally {
+        setPromosLoading(false);
       }
     },
     [call, key],
@@ -183,6 +215,72 @@ export default function AdminPage() {
     }
   };
 
+  const savePromo = async () => {
+    const body = {
+      ...promoForm,
+      code: promoForm.code.trim().toUpperCase(),
+      value: Number(promoForm.value),
+    };
+    const path = editingPromoCode
+      ? `/api/admin/promos/${encodeURIComponent(editingPromoCode)}`
+      : "/api/admin/promos";
+    try {
+      const response = await call(path, {
+        method: editingPromoCode ? "PATCH" : "POST",
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMsg(`Ошибка: ${data.error}`);
+        return;
+      }
+      setEditingPromoCode(null);
+      setPromoForm({ code: "", discountType: "percent", value: "", active: true });
+      if (await loadPromos()) setMsg(editingPromoCode ? "Промокод обновлён" : "Промокод создан");
+    } catch (error) {
+      console.error("Could not save promo code", error);
+      setMsg("Не удалось сохранить промокод");
+    }
+  };
+
+  const changePromoStatus = async (promo: PromoCodeDto) => {
+    try {
+      const response = await call(`/api/admin/promos/${encodeURIComponent(promo.code)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ...promo, active: !promo.active }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMsg(`Ошибка: ${data.error}`);
+        return;
+      }
+      if (await loadPromos()) setMsg(promo.active ? "Промокод отключён" : "Промокод включён");
+    } catch (error) {
+      console.error("Could not change promo status", error);
+      setMsg("Не удалось изменить статус промокода");
+    }
+  };
+
+  const removePromo = async (code: string) => {
+    if (!window.confirm(`Удалить промокод ${code}?`)) return;
+    try {
+      const response = await call(`/api/admin/promos/${encodeURIComponent(code)}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) {
+        setMsg(`Ошибка: ${data.error}`);
+        return;
+      }
+      if (await loadPromos()) setMsg("Промокод удалён");
+      if (editingPromoCode === code) {
+        setEditingPromoCode(null);
+        setPromoForm({ code: "", discountType: "percent", value: "", active: true });
+      }
+    } catch (error) {
+      console.error("Could not delete promo code", error);
+      setMsg("Не удалось удалить промокод");
+    }
+  };
+
   const uploadProductImage = async (product: ProductDto, file: File) => {
     try {
       const formData = new FormData();
@@ -259,6 +357,7 @@ export default function AdminPage() {
       onClick={() => {
         setTab(t);
         if (t === "settings") void loadSettings();
+        if (t === "promos") void loadPromos();
       }}
       className={`cursor-pointer rounded-full px-4 py-2 text-sm ${tab === t ? "bg-blue-600 font-semibold text-white" : "bg-white"}`}
     >
@@ -273,6 +372,7 @@ export default function AdminPage() {
         {tabBtn("orders", `Заказы (${orders.length})`)}
         {tabBtn("products", `Товары (${products.length})`)}
         {tabBtn("io", "Импорт / экспорт")}
+        {tabBtn("promos", `Промокоды (${promos.length})`)}
         {tabBtn("settings", "Настройки магазина")}
         <Link href="/" className="ml-auto cursor-pointer text-sm text-blue-600">
           ← Витрина
@@ -431,6 +531,116 @@ export default function AdminPage() {
           <Btn onClick={saveStoreSettings} disabled={settingsLoading || settingsSaving}>
             {settingsLoading ? "Загрузка…" : settingsSaving ? "Сохранение…" : "Сохранить настройки"}
           </Btn>
+        </section>
+      )}
+      {tab === "promos" && (
+        <section className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
+          <div>
+            <h2 className="font-semibold">Управление промокодами</h2>
+            <p className="mt-1 text-sm text-slate-500">Промокоды проверяются при оформлении заказа и применяются только если активны.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="space-y-1.5">
+              <span className="block text-sm font-medium">Код</span>
+              <input
+                value={promoForm.code}
+                onChange={(event) => setPromoForm({ ...promoForm, code: event.target.value.toUpperCase() })}
+                maxLength={32}
+                placeholder="SUMMER10"
+                className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm uppercase outline-none focus:ring-2 focus:ring-blue-500/30"
+              />
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-sm font-medium">Тип скидки</span>
+              <select
+                value={promoForm.discountType}
+                onChange={(event) => setPromoForm({ ...promoForm, discountType: event.target.value as PromoDiscountType })}
+                className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+              >
+                <option value="percent">Процент</option>
+                <option value="fixed">Фиксированная сумма</option>
+              </select>
+            </label>
+            <label className="space-y-1.5">
+              <span className="block text-sm font-medium">Размер скидки</span>
+              <input
+                type="number"
+                min="0.01"
+                max={promoForm.discountType === "percent" ? 100 : undefined}
+                step={promoForm.discountType === "percent" ? 1 : 0.01}
+                value={promoForm.value}
+                onChange={(event) => setPromoForm({ ...promoForm, value: event.target.value })}
+                placeholder={promoForm.discountType === "percent" ? "10" : "500"}
+                className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+              />
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 self-end rounded-xl bg-slate-100 px-4 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={promoForm.active}
+                onChange={(event) => setPromoForm({ ...promoForm, active: event.target.checked })}
+                className="cursor-pointer"
+              />
+              Активен
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Btn onClick={savePromo}>{editingPromoCode ? "Сохранить изменения" : "Добавить промокод"}</Btn>
+            {editingPromoCode && (
+              <Btn onClick={() => {
+                setEditingPromoCode(null);
+                setPromoForm({ code: "", discountType: "percent", value: "", active: true });
+              }}>
+                Отмена
+              </Btn>
+            )}
+          </div>
+          {promosLoading ? (
+            <p className="text-sm text-slate-500">Загрузка промокодов…</p>
+          ) : promos.length === 0 ? (
+            <p className="text-sm text-slate-500">Промокодов пока нет</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="p-3">Код</th>
+                    <th className="p-3">Скидка</th>
+                    <th className="p-3">Использовано</th>
+                    <th className="p-3">Статус</th>
+                    <th className="p-3">Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {promos.map((promo) => (
+                    <tr key={promo.code} className="border-t border-slate-100">
+                      <td className="p-3 font-mono font-semibold">{promo.code}</td>
+                      <td className="p-3">{promo.value}{promo.discountType === "percent" ? "%" : " (фикс.)"}</td>
+                      <td className="p-3">{promo.used}{promo.usageLimit !== null ? ` / ${promo.usageLimit}` : ""}</td>
+                      <td className="p-3">{promo.active ? "Активен" : "Отключён"}</td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Btn onClick={() => {
+                            setEditingPromoCode(promo.code);
+                            setPromoForm({
+                              code: promo.code,
+                              discountType: promo.discountType,
+                              value: String(promo.value),
+                              active: promo.active,
+                            });
+                          }}>
+                            Изменить
+                          </Btn>
+                          <Btn onClick={() => changePromoStatus(promo)}>{promo.active ? "Отключить" : "Включить"}</Btn>
+                          <Btn danger onClick={() => removePromo(promo.code)}>Удалить</Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
     </main>

@@ -95,6 +95,17 @@ export interface StoreSettingsDto {
   currencySymbol: string;
 }
 
+export type PromoDiscountType = "percent" | "fixed";
+
+export interface PromoCodeDto {
+  code: string;
+  discountType: PromoDiscountType;
+  value: number;
+  active: boolean;
+  used: number;
+  usageLimit: number | null;
+}
+
 export interface CreateOrderInput {
   items: { productId: number; variantId?: number | null; quantity: number }[];
   deliveryMethod: DeliveryMethod;
