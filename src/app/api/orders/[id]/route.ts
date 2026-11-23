@@ -7,5 +7,5 @@ export const GET = withUser<{ params: Promise<{ id: string }> }>(async (_req, us
   const { id } = await params;
   const full = Number.isInteger(Number(id)) ? await getOrderFull(Number(id)) : null;
   if (!full || full.order.userId !== user.id) return fail("Not found", 404);
-  return json(toOrderDto(full.order, full.items));
+  return json(toOrderDto(full.order, full.items, full.user));
 });

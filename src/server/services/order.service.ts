@@ -20,7 +20,7 @@ import { getProvider } from "./payment";
 
 export type OrderAction = "pay" | "processing" | "shipped" | "completed" | "cancel";
 
-export function toOrderDto(o: DbOrder, items: DbOrderItem[]): OrderDto {
+export function toOrderDto(o: DbOrder, items: DbOrderItem[], user?: DbUser | null): OrderDto {
   return {
     id: o.id,
     status: o.status as OrderDto["status"],
@@ -30,6 +30,8 @@ export function toOrderDto(o: DbOrder, items: DbOrderItem[]): OrderDto {
     address: o.address,
     customerName: o.customerName,
     customerPhone: o.customerPhone,
+    customerUsername: o.customerUsername ?? user?.username ?? null,
+    customerTelegramId: user?.tgId ?? null,
     comment: o.comment,
     promoCode: o.promoCode,
     subtotal: o.subtotal,
@@ -66,10 +68,12 @@ async function withItems(rows: DbOrder[]): Promise<OrderDto[]> {
     .from(orderItems)
     .where(inArray(orderItems.orderId, rows.map((r) => r.id)))
     .orderBy(orderItems.id);
+  const buyers = await db.select().from(users).where(inArray(users.id, [...new Set(rows.map((r) => r.userId))]));
   return rows.map((o) =>
     toOrderDto(
       o,
       items.filter((i) => i.orderId === o.id),
+      buyers.find((u) => u.id === o.userId) ?? null,
     ),
   );
 }
@@ -79,8 +83,9 @@ export async function listUserOrders(userId: number, limit = 50) {
   return withItems(rows);
 }
 
-export async function listAllOrders(limit = 100) {
-  const rows = await db.select().from(orders).orderBy(desc(orders.id)).limit(limit);
+export async function listAllOrders(limit?: number) {
+  const query = db.select().from(orders).orderBy(desc(orders.id));
+  const rows = limit ? await query.limit(limit) : await query;
   return withItems(rows);
 }
 
@@ -209,7 +214,7 @@ export async function createOrder(user: DbUser, input: CreateOrderInput) {
   const full = await getOrderFull(created.order.id);
   const order = full?.order ?? created.order;
   const payment = await createPayment(order, created.items, user);
-  return { order: toOrderDto(order, created.items), payment };
+  return { order: toOrderDto(order, created.items, user), payment };
 }
 
 export async function createPayment(order: DbOrder, items: DbOrderItem[], user: DbUser) {

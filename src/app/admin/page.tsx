@@ -114,6 +114,20 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadOrders = async () => {
+    const r = await call("/api/admin/orders/export");
+    if (!r.ok) {
+      setMsg("Не удалось экспортировать заказы");
+      return;
+    }
+    const url = URL.createObjectURL(await r.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "orders.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const report = async (r: Response) => {
     const d = await r.json();
     if (!r.ok) return setMsg(`Ошибка: ${d.error}`);
@@ -160,6 +174,9 @@ export default function AdminPage() {
 
       {tab === "orders" && (
         <div className="space-y-3">
+          <div className="flex justify-end">
+            <Btn onClick={downloadOrders}>📥 Экспорт в Excel</Btn>
+          </div>
           {orders.length === 0 && <p className="text-slate-500">Заказов пока нет</p>}
           {orders.map((o) => (
             <div key={o.id} className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">

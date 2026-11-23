@@ -53,6 +53,8 @@ export interface OrderDto {
   address: string;
   customerName: string;
   customerPhone: string;
+  customerUsername: string | null;
+  customerTelegramId: number | null;
   comment: string;
   promoCode: string | null;
   subtotal: number;

@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, productVariants, products } from "@/db/schema";
+import type { OrderDto } from "@/types";
 
 export const EXPORT_HEADERS = ["SKU", "Name", "Category", "Price", "Stock", "Image", "Description"] as const;
 
@@ -50,6 +51,65 @@ export async function exportProducts(format: "xlsx" | "csv") {
   if (format === "csv") return Buffer.from("\ufeff" + XLSX.utils.sheet_to_csv(ws), "utf8");
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Products");
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer);
+}
+
+export function exportOrdersToExcel(orders: OrderDto[]) {
+  const statusNames: Record<OrderDto["status"], string> = {
+    new: "Новый",
+    paid: "Оплачен",
+    processing: "В сборке",
+    shipped: "Отправлен",
+    completed: "Завершён",
+    cancelled: "Отклонён",
+  };
+  const paymentNames: Record<OrderDto["paymentMethod"], string> = {
+    stars: "Telegram Stars",
+    card: "Карта",
+    manual: "Ручная оплата",
+  };
+
+  const data = orders.map((order) => {
+    const telegram = order.customerUsername
+      ? `@${order.customerUsername}${order.customerTelegramId ? ` (ID: ${order.customerTelegramId})` : ""}`
+      : order.customerTelegramId
+        ? `ID: ${order.customerTelegramId}`
+        : "";
+    const customer = [
+      order.customerName,
+      order.customerPhone,
+      telegram,
+    ].filter(Boolean).join(", ");
+    const composition = order.items
+      .map((item) => `${item.name}${item.variantName ? ` (${item.variantName})` : ""} — ${item.quantity} шт.`)
+      .join("; ");
+
+    return {
+      "ID заказа": order.id,
+      "Дата и время создания": order.createdAt,
+      "Клиент (Имя, Телефон, Telegram Username/ID)": customer,
+      "Состав заказа": composition,
+      "Итоговая сумма": `${order.total} ${order.currency}`,
+      "Способ оплаты": paymentNames[order.paymentMethod],
+      "Статус заказа": statusNames[order.status],
+    };
+  });
+
+  const headers = [
+    "ID заказа",
+    "Дата и время создания",
+    "Клиент (Имя, Телефон, Telegram Username/ID)",
+    "Состав заказа",
+    "Итоговая сумма",
+    "Способ оплаты",
+    "Статус заказа",
+  ];
+  const ws = XLSX.utils.json_to_sheet(data, { header: headers });
+  ws["!cols"] = headers.map((header) => ({
+    wch: Math.max(header.length + 2, ...data.map((row) => String(row[header as keyof typeof row] ?? "").length + 2).slice(0, 200)),
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Orders");
   return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer);
 }
 
