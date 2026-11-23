@@ -29,7 +29,7 @@ export const POST = withAdmin(async (req) => {
 
   const filename = `${randomUUID()}.${type.extension}`;
   if (process.env.VERCEL === "1") {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (!process.env.BLOB_STORE_ID && !process.env.BLOB_READ_WRITE_TOKEN) {
       return fail("Image storage is not configured. Connect a Vercel Blob store.", 503);
     }
     try {
