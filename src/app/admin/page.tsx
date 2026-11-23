@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<ProductDto[]>([]);
   const [msg, setMsg] = useState("");
   const [sheetUrl, setSheetUrl] = useState("");
+  const [importFileName, setImportFileName] = useState("");
 
   const call = useCallback(
     async (path: string, init: RequestInit = {}, k = key) => {
@@ -250,7 +251,7 @@ export default function AdminPage() {
                     {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} (вариации)</span> : <NumInput key={`stock-${p.id}-${p.stock}`} value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
                     {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">нет</span>}
                   </td>
-                  <td className="p-3"><input type="checkbox" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
+                  <td className="p-3"><input type="checkbox" className="cursor-pointer" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
                 </tr>
               ))}
             </tbody>
@@ -267,7 +268,24 @@ export default function AdminPage() {
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
             <h2 className="font-semibold">Импорт из файла (XLSX / CSV)</h2>
             <p className="text-sm text-slate-500">Колонки: SKU, Name, Category, Price, Stock, Image, Description (или Артикул, Название, Категория, Цена, Остаток, Ссылка на фото). Строки обновляются по артикулу.</p>
-            <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex cursor-pointer items-center rounded-xl bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500">
+                📁 Выберите файл
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    event.currentTarget.value = "";
+                    if (!file) return;
+                    setImportFileName(file.name);
+                    void upload(file);
+                  }}
+                />
+              </label>
+              {importFileName && <span className="text-sm text-slate-600">{importFileName}</span>}
+            </div>
           </section>
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
             <h2 className="font-semibold">Импорт из Google Таблицы</h2>
@@ -354,7 +372,7 @@ function ProductImageEditor({
           type="button"
           disabled={uploading}
           onClick={() => fileInput.current?.click()}
-          className="text-left text-xs font-medium text-blue-700 disabled:opacity-50"
+          className="cursor-pointer text-left text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {uploading ? "Загрузка…" : imageUrl && !previewFailed ? "📷 Заменить фото" : "📷 Добавить фото"}
         </button>
@@ -365,7 +383,7 @@ function ProductImageEditor({
 
 function Btn({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
   return (
-    <button onClick={onClick} className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium ${danger ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+    <button onClick={onClick} className={`shrink-0 cursor-pointer rounded-xl px-3.5 py-2 text-sm font-medium ${danger ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
       {children}
     </button>
   );
