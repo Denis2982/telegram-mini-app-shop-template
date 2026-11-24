@@ -2,21 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebApp } from "@/hooks/useTelegram";
+import { api } from "@/api/client";
+import { translate, type Dict } from "@/lib/i18n";
 import type { OrderDto, ProductDto, PromoCodeDto, PromoDiscountType, StoreSettingsDto } from "@/types";
 import Link from 'next/link'
 
 type Tab = "orders" | "products" | "io" | "promos" | "settings";
 
-const STATUS_LABEL: Record<string, string> = {
-  new: "Новый",
-  paid: "Оплачен",
-  processing: "В сборке",
-  shipped: "Отправлен",
-  completed: "Завершён",
-  cancelled: "Отклонён",
-};
-
 export default function AdminPage() {
+  const [dict, setDict] = useState<Dict>({});
+  const t = useCallback((key: string, vars?: Record<string, string | number>) => translate(dict, key, vars), [dict]);
   const [key, setKey] = useState("")
   const restoreAttempted = useRef(false);
   const [authed, setAuthed] = useState(false);
@@ -43,6 +38,12 @@ export default function AdminPage() {
     value: "",
     active: true,
   });
+
+  useEffect(() => {
+    void api.config(getWebApp()?.initDataUnsafe?.user?.language_code)
+      .then((config) => setDict(config.dict))
+      .catch(() => setDict({}));
+  }, []);
 
   const call = useCallback(
     async (path: string, init: RequestInit = {}, k = key) => {
@@ -74,7 +75,7 @@ export default function AdminPage() {
         const response = await call("/api/admin/settings", {}, k);
         const data = await response.json();
         if (!response.ok) {
-          setMsg(`Ошибка: ${data.error}`);
+          setMsg(`${t("admin.error")} ${data.error}`);
           return false;
         }
         const settings = data as StoreSettingsDto;
@@ -88,7 +89,7 @@ export default function AdminPage() {
         return true;
       } catch (error) {
         console.error("Could not load store settings", error);
-        setMsg("Не удалось загрузить настройки магазина");
+        setMsg(t("admin.settingsLoadError"));
         return false;
       } finally {
         setSettingsLoading(false);
@@ -104,14 +105,14 @@ export default function AdminPage() {
         const response = await call("/api/admin/promos", {}, k);
         const data = await response.json();
         if (!response.ok) {
-          setMsg(`Ошибка: ${data.error}`);
+          setMsg(`${t("admin.error")} ${data.error}`);
           return false;
         }
         setPromos(data as PromoCodeDto[]);
         return true;
       } catch (error) {
         console.error("Could not load promo codes", error);
-        setMsg("Не удалось загрузить промокоды");
+        setMsg(t("admin.promosLoadError"));
         return false;
       } finally {
         setPromosLoading(false);
@@ -159,13 +160,13 @@ export default function AdminPage() {
   const login = async () => {
     const ok = await load(key);
     setAuthed(ok);
-    setMsg(ok ? "" : "Неверный ключ");
+    setMsg(ok ? "" : t("admin.invalidKey"));
     if (ok) sessionStorage.setItem("admin-key", key);
   };
 
   const act = async (id: number, action: string) => {
     const r = await call(`/api/admin/orders/${id}`, { method: "POST", body: JSON.stringify({ action }) });
-    if (!r.ok) setMsg(`Ошибка: ${(await r.json()).error}`);
+    if (!r.ok) setMsg(`${t("admin.error")} ${(await r.json()).error}`);
     else setMsg("");
     await load();
   };
@@ -174,7 +175,7 @@ export default function AdminPage() {
     const r = await call(`/api/admin/products/${id}`, { method: "PATCH", body: JSON.stringify(body) });
     if (!r.ok) {
       const error = await r.json().catch(() => ({ error: "Internal error" }));
-      setMsg(context ? `${context}: ${error.error}` : `Ошибка: ${error.error}`);
+      setMsg(context ? `${context}: ${error.error}` : `${t("admin.error")} ${error.error}`);
       return false;
     }
     setMsg("");
@@ -196,7 +197,7 @@ export default function AdminPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setMsg(`Ошибка: ${data.error}`);
+        setMsg(`${t("admin.error")} ${data.error}`);
         return;
       }
       const saved = data as StoreSettingsDto;
@@ -206,10 +207,10 @@ export default function AdminPage() {
         currencyCode: saved.currencyCode,
         currencySymbol: saved.currencySymbol,
       });
-      setMsg("Настройки магазина сохранены");
+      setMsg(t("admin.settingsSaved"));
     } catch (error) {
       console.error("Could not save store settings", error);
-      setMsg("Не удалось сохранить настройки магазина");
+      setMsg(t("admin.settingsSaveError"));
     } finally {
       setSettingsSaving(false);
     }
@@ -231,15 +232,15 @@ export default function AdminPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setMsg(`Ошибка: ${data.error}`);
+        setMsg(`${t("admin.error")} ${data.error}`);
         return;
       }
       setEditingPromoCode(null);
       setPromoForm({ code: "", discountType: "percent", value: "", active: true });
-      if (await loadPromos()) setMsg(editingPromoCode ? "Промокод обновлён" : "Промокод создан");
+      if (await loadPromos()) setMsg(editingPromoCode ? t("admin.promoUpdated") : t("admin.promoCreated"));
     } catch (error) {
       console.error("Could not save promo code", error);
-      setMsg("Не удалось сохранить промокод");
+      setMsg(t("admin.promoSaveError"));
     }
   };
 
@@ -251,33 +252,33 @@ export default function AdminPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        setMsg(`Ошибка: ${data.error}`);
+        setMsg(`${t("admin.error")} ${data.error}`);
         return;
       }
-      if (await loadPromos()) setMsg(promo.active ? "Промокод отключён" : "Промокод включён");
+      if (await loadPromos()) setMsg(promo.active ? t("admin.promoDisabled") : t("admin.promoEnabled"));
     } catch (error) {
       console.error("Could not change promo status", error);
-      setMsg("Не удалось изменить статус промокода");
+      setMsg(t("admin.promoStatusError"));
     }
   };
 
   const removePromo = async (code: string) => {
-    if (!window.confirm(`Удалить промокод ${code}?`)) return;
+    if (!window.confirm(t("admin.promoDeleteConfirm", { code }))) return;
     try {
       const response = await call(`/api/admin/promos/${encodeURIComponent(code)}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok) {
-        setMsg(`Ошибка: ${data.error}`);
+        setMsg(`${t("admin.error")} ${data.error}`);
         return;
       }
-      if (await loadPromos()) setMsg("Промокод удалён");
+      if (await loadPromos()) setMsg(t("admin.promoDeleted"));
       if (editingPromoCode === code) {
         setEditingPromoCode(null);
         setPromoForm({ code: "", discountType: "percent", value: "", active: true });
       }
     } catch (error) {
       console.error("Could not delete promo code", error);
-      setMsg("Не удалось удалить промокод");
+      setMsg(t("admin.promoDeleteError"));
     }
   };
 
@@ -287,16 +288,16 @@ export default function AdminPage() {
       formData.append("file", file);
       const response = await call("/api/admin/upload", { method: "POST", body: formData });
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: "Не удалось загрузить фото" }));
-        setMsg(`Не удалось загрузить фото: ${error.error ?? "Неизвестная ошибка"}`);
+        const error = await response.json().catch(() => ({ error: t("admin.photoLoadError") }));
+        setMsg(`${t("admin.photoLoadError")}: ${error.error ?? t("admin.unknownError")}`);
         return null;
       }
       const { url } = (await response.json()) as { url: string };
       const images = [url, ...product.images.slice(1)];
-      return (await patch(product.id, { images }, "Фото загружено, но не удалось сохранить его у товара")) ? url : null;
+      return (await patch(product.id, { images }, t("admin.photoSaveError"))) ? url : null;
     } catch (error) {
       console.error("Product image upload failed", error);
-      setMsg("Ошибка: не удалось загрузить фото");
+      setMsg(`${t("admin.error")} ${t("admin.photoUploadError")}`);
       return null;
     }
   };
@@ -314,7 +315,7 @@ export default function AdminPage() {
   const downloadOrders = async () => {
     const r = await call("/api/admin/orders/export");
     if (!r.ok) {
-      setMsg("Не удалось экспортировать заказы");
+      setMsg(t("admin.ordersExportError"));
       return;
     }
     const url = URL.createObjectURL(await r.blob());
@@ -327,8 +328,8 @@ export default function AdminPage() {
 
   const report = async (r: Response) => {
     const d = await r.json();
-    if (!r.ok) return setMsg(`Ошибка: ${d.error}`);
-    setMsg(`Создано: ${d.created}, обновлено: ${d.updated}, ошибок: ${d.errors.length}${d.errors.length ? " — " + d.errors.slice(0, 3).map((e: { row: number; message: string }) => `стр.${e.row}: ${e.message}`).join("; ") : ""}`);
+    if (!r.ok) return setMsg(`${t("admin.error")} ${d.error}`);
+    setMsg(`${t("admin.importCreated")} ${d.created}, ${t("admin.importUpdated")} ${d.updated}, ${t("admin.importErrors")} ${d.errors.length}${d.errors.length ? " — " + d.errors.slice(0, 3).map((e: { row: number; message: string }) => `${t("admin.importRow")}.${e.row}: ${e.message}`).join("; ") : ""}`);
     await load();
   };
 
@@ -342,11 +343,11 @@ export default function AdminPage() {
     return (
       <main className="mx-auto grid min-h-screen max-w-sm place-items-center p-6">
         <div className="w-full space-y-3 rounded-2xl bg-white p-6 shadow">
-          <h1 className="text-xl font-bold">Админ-панель</h1>
+          <h1 className="text-xl font-bold">{t("admin.panelTitle")}</h1>
           <input type="password" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} placeholder="ADMIN_API_KEY" className="w-full rounded-xl bg-slate-100 px-4 py-3 outline-none" />
-          <button onClick={login} className="w-full rounded-xl bg-blue-600 py-3 font-semibold text-white">Войти</button>
+          <button onClick={login} className="w-full rounded-xl bg-blue-600 py-3 font-semibold text-white">{t("admin.login")}</button>
           {msg && <p className="text-sm text-red-600">{msg}</p>}
-          <p className="text-xs text-slate-500">В демо-режиме (без BOT_TOKEN) ключ по умолчанию: <code>admin</code></p>
+          <p className="text-xs text-slate-500">{t("admin.demoMode")} <code>admin</code></p>
         </div>
       </main>
     );
@@ -368,14 +369,14 @@ export default function AdminPage() {
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 text-slate-900">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-3 text-xl font-bold">Админ-панель</h1>
-        {tabBtn("orders", `Заказы (${orders.length})`)}
-        {tabBtn("products", `Товары (${products.length})`)}
-        {tabBtn("io", "Импорт / экспорт")}
-        {tabBtn("promos", `Промокоды (${promos.length})`)}
-        {tabBtn("settings", "Настройки магазина")}
+        <h1 className="mr-3 text-xl font-bold">{t("admin.panelTitle")}</h1>
+        {tabBtn("orders", `${t("admin.orders")} (${orders.length})`)}
+        {tabBtn("products", `${t("admin.products")} (${products.length})`)}
+        {tabBtn("io", t("admin.io"))}
+        {tabBtn("promos", `${t("admin.promos")} (${promos.length})`)}
+        {tabBtn("settings", t("admin.settings"))}
         <Link href="/" className="ml-auto cursor-pointer text-sm text-blue-600">
-          ← Витрина
+          ← {t("admin.storefront")}
         </Link>
       </div>
       {msg && <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{msg}</p>}
@@ -383,24 +384,24 @@ export default function AdminPage() {
       {tab === "orders" && (
         <div className="space-y-3">
           <div className="flex justify-end">
-            <Btn onClick={downloadOrders}>📥 Экспорт в Excel</Btn>
+            <Btn onClick={downloadOrders}>📥 {t("admin.exportOrders")}</Btn>
           </div>
-          {orders.length === 0 && <p className="text-slate-500">Заказов пока нет</p>}
+          {orders.length === 0 && <p className="text-slate-500">{t("admin.noOrders")}</p>}
           {orders.map((o) => (
             <div key={o.id} className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <b>Заказ №{o.id}</b>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{STATUS_LABEL[o.status]} · {o.paymentStatus === "paid" ? "оплачен" : "не оплачен"} · {o.paymentMethod}</span>
+                <b>{t("admin.order", { id: o.id })}</b>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{t(`status.${o.status}`)} · {o.paymentStatus === "paid" ? t("admin.paid") : t("admin.unpaid")} · {o.paymentMethod}</span>
               </div>
               <p className="text-sm text-slate-600">{o.customerName}, {o.customerPhone} — {o.deliveryMethod}: {o.address}</p>
               <p className="text-sm">{o.items.map((i) => `${i.name}${i.variantName ? ` (${i.variantName})` : ""} × ${i.quantity}`).join("; ")}</p>
-              <p className="font-semibold">Итого: {o.total} {o.currency}</p>
+              <p className="font-semibold">{t("admin.total")} {o.total} {o.currency}</p>
               <div className="flex flex-wrap gap-2">
-                {o.paymentStatus !== "paid" && o.status !== "cancelled" && <Btn onClick={() => act(o.id, "pay")}>💳 Подтвердить оплату</Btn>}
-                {o.status === "paid" && <Btn onClick={() => act(o.id, "processing")}>📦 В сборку</Btn>}
-                {["paid", "processing"].includes(o.status) && <Btn onClick={() => act(o.id, "shipped")}>🚚 Отправлен</Btn>}
-                {["paid", "processing", "shipped"].includes(o.status) && <Btn onClick={() => act(o.id, "completed")}>✅ Завершен</Btn>}
-                {!["completed", "cancelled"].includes(o.status) && <Btn danger onClick={() => act(o.id, "cancel")}>❌ Отклонить</Btn>}
+                {o.paymentStatus !== "paid" && o.status !== "cancelled" && <Btn onClick={() => act(o.id, "pay")}>{t("admin.btn.pay")}</Btn>}
+                {o.status === "paid" && <Btn onClick={() => act(o.id, "processing")}>{t("admin.btn.processing")}</Btn>}
+                {["paid", "processing"].includes(o.status) && <Btn onClick={() => act(o.id, "shipped")}>{t("admin.btn.shipped")}</Btn>}
+                {["paid", "processing", "shipped"].includes(o.status) && <Btn onClick={() => act(o.id, "completed")}>{t("admin.btn.completed")}</Btn>}
+                {!["completed", "cancelled"].includes(o.status) && <Btn danger onClick={() => act(o.id, "cancel")}>{t("admin.btn.cancel")}</Btn>}
               </div>
             </div>
           ))}
@@ -411,7 +412,7 @@ export default function AdminPage() {
         <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
-              <tr><th className="p-3">Артикул</th><th className="p-3">Фото</th><th className="p-3">Название</th><th className="p-3">Категория</th><th className="p-3">Цена</th><th className="p-3">Остаток</th><th className="p-3">Активен</th></tr>
+              <tr><th className="p-3">{t("admin.productSku")}</th><th className="p-3">{t("admin.productPhoto")}</th><th className="p-3">{t("admin.productName")}</th><th className="p-3">{t("admin.productCategory")}</th><th className="p-3">{t("admin.productPrice")}</th><th className="p-3">{t("admin.productStock")}</th><th className="p-3">{t("admin.productActive")}</th></tr>
             </thead>
             <tbody>
               {products.map((p) => (
@@ -422,14 +423,15 @@ export default function AdminPage() {
                       product={p}
                       onSaveUrl={(url) => patch(p.id, { images: url ? [url, ...p.images.slice(1)] : p.images.slice(1) })}
                       onUpload={(file) => uploadProductImage(p, file)}
+                      t={t}
                     />
                   </td>
                   <td className="p-3">{p.name}</td>
                   <td className="p-3">{p.categoryName ?? "—"}</td>
                   <td className="p-3"><NumInput key={`price-${p.id}-${p.price}`} value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
                   <td className="p-3">
-                    {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} (вариации)</span> : <NumInput key={`stock-${p.id}-${p.stock}`} value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
-                    {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">нет</span>}
+                    {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} ({t("admin.productVariants")})</span> : <NumInput key={`stock-${p.id}-${p.stock}`} value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
+                    {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">{t("admin.productOut")}</span>}
                   </td>
                   <td className="p-3"><input type="checkbox" className="cursor-pointer" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
                 </tr>
@@ -442,15 +444,15 @@ export default function AdminPage() {
       {tab === "io" && (
         <div className="space-y-4">
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="font-semibold">Экспорт номенклатуры</h2>
+            <h2 className="font-semibold">{t("admin.exportCatalog")}</h2>
             <div className="flex gap-2"><Btn onClick={() => download("xlsx")}>⬇ XLSX</Btn><Btn onClick={() => download("csv")}>⬇ CSV</Btn></div>
           </section>
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="font-semibold">Импорт из файла (XLSX / CSV)</h2>
-            <p className="text-sm text-slate-500">Колонки: SKU, Name, Category, Price, Stock, Image, Description (или Артикул, Название, Категория, Цена, Остаток, Ссылка на фото). Строки обновляются по артикулу.</p>
+            <h2 className="font-semibold">{t("admin.importFile")}</h2>
+            <p className="text-sm text-slate-500">{t("admin.importFileHint")}</p>
             <div className="flex flex-wrap items-center gap-3">
               <label className="inline-flex cursor-pointer items-center rounded-xl bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500">
-                📁 Выберите файл
+                📁 {t("admin.chooseFile")}
                 <input
                   type="file"
                   accept=".xlsx,.xls,.csv"
@@ -468,11 +470,11 @@ export default function AdminPage() {
             </div>
           </section>
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
-            <h2 className="font-semibold">Импорт из Google Таблицы</h2>
-            <p className="text-sm text-slate-500">Таблица должна быть доступна по ссылке (чтение).</p>
+            <h2 className="font-semibold">{t("admin.importSheet")}</h2>
+            <p className="text-sm text-slate-500">{t("admin.importSheetHint")}</p>
             <div className="flex gap-2">
               <input value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm outline-none" />
-              <Btn onClick={async () => sheetUrl && report(await call("/api/admin/products/import", { method: "POST", body: JSON.stringify({ url: sheetUrl }) }))}>Импорт</Btn>
+              <Btn onClick={async () => sheetUrl && report(await call("/api/admin/products/import", { method: "POST", body: JSON.stringify({ url: sheetUrl }) }))}>{t("admin.import")}</Btn>
             </div>
           </section>
         </div>
@@ -481,34 +483,34 @@ export default function AdminPage() {
       {tab === "settings" && (
         <section className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
           <div>
-            <h2 className="font-semibold">Настройки магазина</h2>
-            <p className="mt-1 text-sm text-slate-500">Значения сохраняются в базе данных и заменяют настройки из .env.</p>
+            <h2 className="font-semibold">{t("admin.settings")}</h2>
+            <p className="mt-1 text-sm text-slate-500">{t("admin.settingsHint")}</p>
           </div>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Реквизиты для ручной оплаты</span>
+            <span className="text-sm font-medium">{t("admin.manualDetails")}</span>
             <textarea
               value={settingsForm.manualDetails}
               onChange={(event) => setSettingsForm({ ...settingsForm, manualDetails: event.target.value })}
               rows={5}
               maxLength={5000}
-              placeholder="Название банка, номер карты или счёта, получатель"
+              placeholder={t("admin.manualDetailsPlaceholder")}
               className="w-full resize-y rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
             />
           </label>
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium">Адрес самовывоза</span>
-            <span className="block text-xs text-slate-500">Каждый пункт самовывоза укажите с новой строки.</span>
+            <span className="text-sm font-medium">{t("admin.pickupAddress")}</span>
+            <span className="block text-xs text-slate-500">{t("admin.pickupHint")}</span>
             <textarea
               value={settingsForm.pickupPoints}
               onChange={(event) => setSettingsForm({ ...settingsForm, pickupPoints: event.target.value })}
               rows={4}
-              placeholder="Адрес и часы работы"
+              placeholder={t("admin.pickupPlaceholder")}
               className="w-full resize-y rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
             />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5">
-              <span className="block text-sm font-medium">Код валюты</span>
+              <span className="block text-sm font-medium">{t("admin.currencyCode")}</span>
               <input
                 value={settingsForm.currencyCode}
                 onChange={(event) => setSettingsForm({ ...settingsForm, currencyCode: event.target.value.toUpperCase() })}
@@ -518,7 +520,7 @@ export default function AdminPage() {
               />
             </label>
             <label className="space-y-1.5">
-              <span className="block text-sm font-medium">Обозначение валюты</span>
+              <span className="block text-sm font-medium">{t("admin.currencySymbol")}</span>
               <input
                 value={settingsForm.currencySymbol}
                 onChange={(event) => setSettingsForm({ ...settingsForm, currencySymbol: event.target.value })}
@@ -529,19 +531,19 @@ export default function AdminPage() {
             </label>
           </div>
           <Btn onClick={saveStoreSettings} disabled={settingsLoading || settingsSaving}>
-            {settingsLoading ? "Загрузка…" : settingsSaving ? "Сохранение…" : "Сохранить настройки"}
+            {settingsLoading ? t("admin.loading") : settingsSaving ? t("admin.saving") : t("admin.saveSettings")}
           </Btn>
         </section>
       )}
       {tab === "promos" && (
         <section className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
           <div>
-            <h2 className="font-semibold">Управление промокодами</h2>
-            <p className="mt-1 text-sm text-slate-500">Промокоды проверяются при оформлении заказа и применяются только если активны.</p>
+            <h2 className="font-semibold">{t("admin.promoManagement")}</h2>
+            <p className="mt-1 text-sm text-slate-500">{t("admin.promoHint")}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="space-y-1.5">
-              <span className="block text-sm font-medium">Код</span>
+              <span className="block text-sm font-medium">{t("admin.promoCode")}</span>
               <input
                 value={promoForm.code}
                 onChange={(event) => setPromoForm({ ...promoForm, code: event.target.value.toUpperCase() })}
@@ -551,18 +553,18 @@ export default function AdminPage() {
               />
             </label>
             <label className="space-y-1.5">
-              <span className="block text-sm font-medium">Тип скидки</span>
+              <span className="block text-sm font-medium">{t("admin.promoDiscountType")}</span>
               <select
                 value={promoForm.discountType}
                 onChange={(event) => setPromoForm({ ...promoForm, discountType: event.target.value as PromoDiscountType })}
                 className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
               >
-                <option value="percent">Процент</option>
-                <option value="fixed">Фиксированная сумма</option>
+                <option value="percent">{t("admin.promoPercent")}</option>
+                <option value="fixed">{t("admin.promoFixed")}</option>
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="block text-sm font-medium">Размер скидки</span>
+              <span className="block text-sm font-medium">{t("admin.promoValue")}</span>
               <input
                 type="number"
                 min="0.01"
@@ -581,43 +583,43 @@ export default function AdminPage() {
                 onChange={(event) => setPromoForm({ ...promoForm, active: event.target.checked })}
                 className="cursor-pointer"
               />
-              Активен
+              {t("admin.promoActive")}
             </label>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Btn onClick={savePromo}>{editingPromoCode ? "Сохранить изменения" : "Добавить промокод"}</Btn>
+            <Btn onClick={savePromo}>{editingPromoCode ? t("admin.promoSave") : t("admin.promoAdd")}</Btn>
             {editingPromoCode && (
               <Btn onClick={() => {
                 setEditingPromoCode(null);
                 setPromoForm({ code: "", discountType: "percent", value: "", active: true });
               }}>
-                Отмена
+                {t("admin.cancel")}
               </Btn>
             )}
           </div>
           {promosLoading ? (
-            <p className="text-sm text-slate-500">Загрузка промокодов…</p>
+            <p className="text-sm text-slate-500">{t("admin.promosLoading")}</p>
           ) : promos.length === 0 ? (
-            <p className="text-sm text-slate-500">Промокодов пока нет</p>
+            <p className="text-sm text-slate-500">{t("admin.noPromos")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="text-slate-500">
                   <tr>
-                    <th className="p-3">Код</th>
-                    <th className="p-3">Скидка</th>
-                    <th className="p-3">Использовано</th>
-                    <th className="p-3">Статус</th>
-                    <th className="p-3">Действия</th>
+                    <th className="p-3">{t("admin.promoCode")}</th>
+                    <th className="p-3">{t("admin.promoDiscount")}</th>
+                    <th className="p-3">{t("admin.promoUsed")}</th>
+                    <th className="p-3">{t("admin.promoStatus")}</th>
+                    <th className="p-3">{t("admin.promoActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {promos.map((promo) => (
                     <tr key={promo.code} className="border-t border-slate-100">
                       <td className="p-3 font-mono font-semibold">{promo.code}</td>
-                      <td className="p-3">{promo.value}{promo.discountType === "percent" ? "%" : " (фикс.)"}</td>
+                      <td className="p-3">{promo.value}{promo.discountType === "percent" ? "%" : ` (${t("admin.promoFixedShort")})`}</td>
                       <td className="p-3">{promo.used}{promo.usageLimit !== null ? ` / ${promo.usageLimit}` : ""}</td>
-                      <td className="p-3">{promo.active ? "Активен" : "Отключён"}</td>
+                      <td className="p-3">{promo.active ? t("admin.promoActive") : t("admin.promoInactive")}</td>
                       <td className="p-3">
                         <div className="flex flex-wrap gap-2">
                           <Btn onClick={() => {
@@ -629,10 +631,10 @@ export default function AdminPage() {
                               active: promo.active,
                             });
                           }}>
-                            Изменить
+                            {t("admin.edit")}
                           </Btn>
-                          <Btn onClick={() => changePromoStatus(promo)}>{promo.active ? "Отключить" : "Включить"}</Btn>
-                          <Btn danger onClick={() => removePromo(promo.code)}>Удалить</Btn>
+                          <Btn onClick={() => changePromoStatus(promo)}>{promo.active ? t("admin.disable") : t("admin.enable")}</Btn>
+                          <Btn danger onClick={() => removePromo(promo.code)}>{t("admin.delete")}</Btn>
                         </div>
                       </td>
                     </tr>
@@ -651,10 +653,12 @@ function ProductImageEditor({
   product,
   onSaveUrl,
   onUpload,
+  t,
 }: {
   product: ProductDto;
   onSaveUrl: (url: string) => Promise<boolean>;
   onUpload: (file: File) => Promise<string | null>;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const currentImage = product.images[0] ?? "";
   const [draftImage, setDraftImage] = useState({ base: currentImage, value: currentImage });
@@ -682,12 +686,12 @@ function ProductImageEditor({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={imageUrl}
-          alt={`Фото товара ${product.name}`}
+          alt={t("admin.photoOf", { name: product.name })}
           onError={() => setFailedUrl(imageUrl)}
           className="h-12 w-12 shrink-0 rounded-lg bg-slate-100 object-cover"
         />
       ) : (
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-slate-100 text-xl" aria-label="Фото отсутствует">
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-slate-100 text-xl" aria-label={t("admin.photoMissing")}>
           📷
         </div>
       )}
@@ -703,8 +707,8 @@ function ProductImageEditor({
             const nextUrl = imageUrl.trim();
             if (nextUrl !== (product.images[0] ?? "")) void onSaveUrl(nextUrl);
           }}
-          placeholder="URL фото"
-          aria-label={`URL фото товара ${product.name}`}
+          placeholder={t("admin.photoUrl")}
+          aria-label={t("admin.photoUrlOf", { name: product.name })}
           className="w-full rounded-lg bg-slate-100 px-2 py-1 text-xs outline-none"
         />
         <input
@@ -720,7 +724,7 @@ function ProductImageEditor({
           onClick={() => fileInput.current?.click()}
           className="cursor-pointer text-left text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {uploading ? "Загрузка…" : imageUrl && !previewFailed ? "📷 Заменить фото" : "📷 Добавить фото"}
+          {uploading ? t("admin.loading") : imageUrl && !previewFailed ? `📷 ${t("admin.replacePhoto")}` : `📷 ${t("admin.addPhoto")}`}
         </button>
       </div>
     </div>

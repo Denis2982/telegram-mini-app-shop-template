@@ -4,6 +4,7 @@ import { registerAdmin } from "./handlers/admin";
 import { registerOrders } from "./handlers/orders";
 import { registerPayments } from "./handlers/payments";
 import { registerStart } from "./handlers/start";
+import { tr } from "../locale";
 
 let bot: Bot | null = null;
 let botToken = "";
@@ -30,13 +31,13 @@ export function getBot(): Bot | null {
     b.command("admin", async (ctx) => {
       const cfg = getConfig();
       if (!ctx.from || !cfg.adminIds.includes(ctx.from.id)) {
-        return ctx.reply("⛔ У вас нет прав администратора.");
+        return ctx.reply(tr(ctx.from?.language_code, "bot.adminNoAccess"));
       }
 
       const adminUrl = `${cfg.miniAppUrl}/admin`;
-      await ctx.reply("🔧 Панель администратора\n\nНажмите на кнопку ниже для перехода в админку:", {
+      await ctx.reply(`${tr(ctx.from?.language_code, "bot.adminPanelTitle")}\n\n${tr(ctx.from?.language_code, "bot.adminPanelHint")}`, {
         reply_markup: {
-          inline_keyboard: [[{ text: "⚙️ Открыть админ-панель", url: adminUrl }]],
+          inline_keyboard: [[{ text: tr(ctx.from?.language_code, "bot.adminPanelButton"), url: adminUrl }]],
         },
       });
     });

@@ -145,7 +145,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
 
       <Section title={t("checkout.promo")}>
         <div className="flex gap-2">
-          <input className={`${inputCls} uppercase`} value={promoInput} onChange={(e) => setPromoInput(e.target.value)} placeholder="Введите промокод" />
+          <input className={`${inputCls} uppercase`} value={promoInput} onChange={(e) => setPromoInput(e.target.value)} placeholder={t("checkout.promoPlaceholder")} />
           <button onClick={applyPromo} className="shrink-0 rounded-xl bg-tg-button px-4 text-sm font-semibold text-tg-button-text">
             {t("checkout.apply")}
           </button>
