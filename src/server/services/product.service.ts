@@ -4,6 +4,7 @@ import { categories, productVariants, products } from "@/db/schema";
 import type { CategoryDto, ProductDto } from "@/types";
 import { ensureSeeded } from "../seed";
 import { HttpError } from "../http";
+import { releaseExpiredStockReservations } from "./stock.service";
 
 export type ProductSort = "popular" | "price_asc" | "price_desc" | "new";
 
@@ -65,6 +66,7 @@ async function hydrate(rows: (typeof products.$inferSelect)[]): Promise<ProductD
 
 export async function listProducts(f: ProductFilter = {}): Promise<ProductDto[]> {
   await ensureSeeded();
+  await releaseExpiredStockReservations();
   const conds: SQL[] = [];
   if (!f.includeInactive) conds.push(eq(products.active, true));
   if (f.ids?.length) conds.push(inArray(products.id, f.ids));
@@ -98,6 +100,7 @@ export async function listProducts(f: ProductFilter = {}): Promise<ProductDto[]>
 }
 
 export async function getProduct(id: number): Promise<ProductDto | null> {
+  await releaseExpiredStockReservations();
   const [row] = await db.select().from(products).where(eq(products.id, id)).limit(1);
   if (!row) return null;
   return (await hydrate([row]))[0];
@@ -303,23 +306,4 @@ export async function deleteCategoryAdmin(id: number) {
   if (child) throw new HttpError("Category contains subcategories", 409);
 
   await db.delete(categories).where(eq(categories.id, id));
-}
-
-/** Decrease stock of a product or variant (never below zero). */
-export async function adjustStock(
-  tx: Pick<typeof db, "update">,
-  item: { productId: number | null; variantId: number | null },
-  delta: number,
-) {
-  if (item.variantId) {
-    await tx
-      .update(productVariants)
-      .set({ stock: sql`greatest(${productVariants.stock} + ${delta}, 0)` })
-      .where(eq(productVariants.id, item.variantId));
-  } else if (item.productId) {
-    await tx
-      .update(products)
-      .set({ stock: sql`greatest(${products.stock} + ${delta}, 0)`, updatedAt: new Date() })
-      .where(eq(products.id, item.productId));
-  }
 }

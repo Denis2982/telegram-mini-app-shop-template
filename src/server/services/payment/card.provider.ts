@@ -20,7 +20,7 @@ export class CardProvider implements IPaymentProvider {
     const cfg = await getEffectiveConfig();
     const title = tr(user.languageCode, "bot.invoiceTitle", { id: order.id });
     const desc = tr(user.languageCode, "bot.invoiceDescription", { id: order.id, store: cfg.storeName });
-    const url = await api.createInvoiceLink(title, desc, `order:${order.id}`, cfg.paymentProviderToken, cfg.currencyCode, [
+    const url = await api.createInvoiceLink(title, desc, `order:${order.id}`, cfg.paymentProviderToken, order.currency, [
       { label: title, amount: Math.round(order.total * 100) },
     ]);
     return { type: "invoice", url };

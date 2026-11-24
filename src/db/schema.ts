@@ -106,6 +106,7 @@ export const orders = pgTable(
     receiptFileId: text("receipt_file_id"),
     adminMessageId: bigint("admin_message_id", { mode: "number" }),
     stockDeducted: boolean("stock_deducted").default(false).notNull(),
+    stockReservedUntil: timestamp("stock_reserved_until"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     paidAt: timestamp("paid_at"),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

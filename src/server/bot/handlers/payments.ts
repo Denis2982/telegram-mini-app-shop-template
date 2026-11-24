@@ -1,9 +1,6 @@
 import type { Bot } from "grammy";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { orders } from "@/db/schema";
 import { tr } from "../../locale";
-import { applyAction } from "../../services/order.service";
+import { applyAction, validateTelegramPreCheckout } from "../../services/order.service";
 
 const parse = (payload: string) => {
   const m = payload.match(/^order:(\d+)$/);
@@ -12,16 +9,27 @@ const parse = (payload: string) => {
 
 export function registerPayments(bot: Bot) {
   bot.on("pre_checkout_query", async (ctx) => {
-    const id = parse(ctx.preCheckoutQuery.invoice_payload);
-    const [o] = id ? await db.select().from(orders).where(eq(orders.id, id)) : [];
-    if (!o || o.paymentStatus === "paid" || o.status === "cancelled") {
+    const query = ctx.preCheckoutQuery;
+    const accepted = await validateTelegramPreCheckout(parse(query.invoice_payload), {
+      telegramUserId: ctx.from.id,
+      totalAmount: query.total_amount,
+      currency: query.currency,
+    });
+    if (!accepted) {
       return void (await ctx.answerPreCheckoutQuery(false, tr(ctx.from.language_code, "bot.preCheckoutFail")));
     }
     await ctx.answerPreCheckoutQuery(true);
   });
 
   bot.on("message:successful_payment", async (ctx) => {
-    const id = parse(ctx.message.successful_payment.invoice_payload);
-    if (id) await applyAction(id, "pay");
+    const payment = ctx.message.successful_payment;
+    const id = parse(payment.invoice_payload);
+    if (!id) return;
+    const result = await applyAction(id, "pay", {
+      telegramUserId: ctx.from.id,
+      totalAmount: payment.total_amount,
+      currency: payment.currency,
+    });
+    if ("error" in result) console.error("Could not apply successful Telegram payment", { orderId: id, error: result.error });
   });
 }

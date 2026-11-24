@@ -127,6 +127,9 @@ export function OrderStatus({
         {needsPayment && (
           <section className="space-y-3 rounded-2xl bg-tg-bg p-4 shadow-sm">
             <p className="font-semibold">💳 {t("order.unpaid")}</p>
+            <p className="text-sm text-tg-hint">
+              {t(order.paymentMethod === "manual" ? "order.manualReservationHint" : "order.onlineReservationHint")}
+            </p>
             {payment?.type === "manual" ? (
               <>
                 <p className="text-sm text-tg-hint">{t("order.manualHint", { total: money(order.total) })}</p>

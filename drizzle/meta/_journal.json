@@ -15,6 +15,13 @@
       "when": 1795457659876,
       "tag": "0001_amusing_pride",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795542421050,
+      "tag": "0002_stock-reservation",
+      "breakpoints": true
     }
   ]
 }

@@ -29,6 +29,7 @@ export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export function getConfig() {
   const isProduction = process.env.NODE_ENV === "production";
+  const enableDemoMode = flag("ENABLE_DEMO_MODE", false);
   const botToken = env("BOT_TOKEN");
   return {
     botToken,
@@ -43,8 +44,10 @@ export function getConfig() {
       .filter((n) => Number.isFinite(n) && n > 0),
     /** Key for the web admin panel (/admin). In local demo mode it defaults to "admin". */
     adminApiKey: env("ADMIN_API_KEY", isProduction || botToken ? "" : "admin"),
-    allowDevAuth: isProduction ? false : flag("ALLOW_DEV_AUTH", !botToken),
-    seedDemo: isProduction ? false : flag("SEED_DEMO_DATA", true),
+    allowDevAuth: isProduction ? enableDemoMode && flag("ALLOW_DEV_AUTH", true) : flag("ALLOW_DEV_AUTH", !botToken),
+    seedDemo: isProduction
+      ? enableDemoMode && flag("SEED_DEMO_DATA", true)
+      : flag("SEED_DEMO_DATA", true),
 
     storeName: env("STORE_NAME", "Commercial Shop"),
     currencyCode: env("CURRENCY_CODE", "RUB"),

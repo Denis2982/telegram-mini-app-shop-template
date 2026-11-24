@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orderItems,
@@ -15,11 +15,31 @@ import type { CreateOrderInput, OrderDto } from "@/types";
 import { availablePaymentMethods, deliveryFeeFor } from "../config";
 import { notifyBuyer, postAdminCard, refreshAdminCard } from "../bot/notify";
 import { HttpError } from "../http";
-import { adjustStock } from "./product.service";
+import {
+  adjustStock,
+  PAYMENT_COMPLETION_GRACE_MS,
+  releaseExpiredStockReservations,
+  stockReservationExpiry,
+} from "./stock.service";
 import { getProvider } from "./payment";
 import { getEffectiveConfig } from "./store-settings.service";
 
 export type OrderAction = "pay" | "processing" | "shipped" | "completed" | "cancel";
+
+type TelegramPaymentInfo = { telegramUserId: number; totalAmount: number; currency: string };
+type ActionResult =
+  | { error: "not_found" | "invalid_state" | "payment_mismatch" | "reservation_expired" | "out_of_stock" }
+  | { order: DbOrder };
+
+function expectedTelegramPayment(order: DbOrder, starsPerUnit: number) {
+  if (order.paymentMethod === "stars") {
+    return { currency: "XTR", amount: Math.max(1, Math.ceil(order.total * starsPerUnit)) };
+  }
+  if (order.paymentMethod === "card") {
+    return { currency: order.currency, amount: Math.round(order.total * 100) };
+  }
+  return null;
+}
 
 export function toOrderDto(o: DbOrder, items: DbOrderItem[], user?: DbUser | null): OrderDto {
   return {
@@ -55,6 +75,7 @@ export function toOrderDto(o: DbOrder, items: DbOrderItem[], user?: DbUser | nul
 }
 
 export async function getOrderFull(id: number) {
+  await releaseExpiredStockReservations();
   const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   if (!order) return null;
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, id)).orderBy(orderItems.id);
@@ -80,11 +101,13 @@ async function withItems(rows: DbOrder[]): Promise<OrderDto[]> {
 }
 
 export async function listUserOrders(userId: number, limit = 50) {
+  await releaseExpiredStockReservations();
   const rows = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.id)).limit(limit);
   return withItems(rows);
 }
 
 export async function listAllOrders(limit?: number) {
+  await releaseExpiredStockReservations();
   const query = db.select().from(orders).orderBy(desc(orders.id));
   const rows = limit ? await query.limit(limit) : await query;
   return withItems(rows);
@@ -126,6 +149,7 @@ export async function createOrder(user: DbUser, input: CreateOrderInput) {
     else lines.set(key, { productId, variantId, quantity });
   }
 
+  await releaseExpiredStockReservations();
   const created = await db.transaction(async (tx) => {
     const productIds = [...new Set([...lines.values()].map((l) => l.productId))];
     const prods = await tx.select().from(products).where(inArray(products.id, productIds));
@@ -180,6 +204,19 @@ export async function createOrder(user: DbUser, input: CreateOrderInput) {
     }
     const deliveryFee = deliveryFeeFor(input.deliveryMethod, subtotal - discount, cfg);
     const total = subtotal - discount + deliveryFee;
+    for (const item of rows) {
+      if (
+        !(await adjustStock(
+          tx,
+          { productId: item.productId ?? null, variantId: item.variantId ?? null },
+          -item.quantity,
+        ))
+      ) {
+        throw new HttpError(`"${item.name}${item.variantName ? ` (${item.variantName})` : ""}" is out of stock`, 409);
+      }
+    }
+
+    const now = new Date();
 
     const [order] = await tx
       .insert(orders)
@@ -198,6 +235,10 @@ export async function createOrder(user: DbUser, input: CreateOrderInput) {
         deliveryFee,
         total,
         currency: cfg.currencyCode,
+        stockDeducted: true,
+        stockReservedUntil: stockReservationExpiry(input.paymentMethod, now),
+        createdAt: now,
+        updatedAt: now,
       })
       .returning();
     const items = await tx
@@ -230,44 +271,149 @@ export async function createPayment(order: DbOrder, items: DbOrderItem[], user: 
   }
 }
 
-/** Applies a manager/system action to an order, adjusts stock and sends notifications. */
-export async function applyAction(orderId: number, action: OrderAction) {
-  const result = await db.transaction(async (tx) => {
-    const [o] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
-    if (!o) return { error: "not_found" as const };
-    const set: Partial<typeof orders.$inferInsert> = { updatedAt: new Date() };
+export async function validateTelegramPreCheckout(orderId: number | null, payment: TelegramPaymentInfo) {
+  if (!orderId) return false;
+  await releaseExpiredStockReservations();
+  const cfg = await getEffectiveConfig();
+  const now = new Date();
 
-    if (action === "pay") {
-      if (o.paymentStatus === "paid" || o.status === "cancelled") return { error: "invalid_state" as const };
-      set.paymentStatus = "paid";
-      set.paidAt = new Date();
-      if (o.status === "new") set.status = "paid";
-      if (!o.stockDeducted) {
-        const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, o.id));
-        for (const it of items) await adjustStock(tx, it, -it.quantity);
-        set.stockDeducted = true;
-      }
-    } else if (action === "processing") {
-      if (o.status !== "paid") return { error: "invalid_state" as const };
-      set.status = "processing";
-    } else if (action === "shipped") {
-      if (!["paid", "processing"].includes(o.status)) return { error: "invalid_state" as const };
-      set.status = "shipped";
-    } else if (action === "completed") {
-      if (!["paid", "processing", "shipped"].includes(o.status)) return { error: "invalid_state" as const };
-      set.status = "completed";
-    } else if (action === "cancel") {
-      if (["completed", "cancelled"].includes(o.status)) return { error: "invalid_state" as const };
-      set.status = "cancelled";
-      if (o.stockDeducted) {
-        const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, o.id));
-        for (const it of items) await adjustStock(tx, it, it.quantity);
-        set.stockDeducted = false;
-      }
+  return db.transaction(async (tx) => {
+    const [order] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
+    if (
+      !order ||
+      order.status !== "new" ||
+      order.paymentStatus !== "unpaid" ||
+      !order.stockDeducted ||
+      !order.stockReservedUntil ||
+      order.stockReservedUntil <= now
+    ) {
+      return false;
     }
-    const [updated] = await tx.update(orders).set(set).where(eq(orders.id, o.id)).returning();
-    return { order: updated };
+
+    const [user] = await tx.select({ tgId: users.tgId }).from(users).where(eq(users.id, order.userId)).limit(1);
+    const expected = expectedTelegramPayment(order, cfg.starsPerUnit);
+    if (
+      !user ||
+      user.tgId !== payment.telegramUserId ||
+      !expected ||
+      expected.currency !== payment.currency ||
+      expected.amount !== payment.totalAmount
+    ) {
+      return false;
+    }
+
+    const [updated] = await tx
+      .update(orders)
+      .set({ stockReservedUntil: new Date(now.getTime() + PAYMENT_COMPLETION_GRACE_MS), updatedAt: now })
+      .where(
+        and(
+          eq(orders.id, order.id),
+          eq(orders.status, "new"),
+          eq(orders.paymentStatus, "unpaid"),
+          eq(orders.stockDeducted, true),
+          gt(orders.stockReservedUntil, now),
+        ),
+      )
+      .returning({ id: orders.id });
+    return Boolean(updated);
   });
+}
+
+class StockUnavailableError extends Error {}
+
+/** Applies a manager/system action to an order, adjusts stock and sends notifications. */
+export async function applyAction(orderId: number, action: OrderAction, telegramPayment?: TelegramPaymentInfo) {
+  await releaseExpiredStockReservations();
+  const cfg = telegramPayment ? await getEffectiveConfig() : null;
+  let result: ActionResult;
+  try {
+    result = await db.transaction(async (tx) => {
+      const [o] = await tx.select().from(orders).where(eq(orders.id, orderId)).for("update");
+      if (!o) return { error: "not_found" as const };
+      const now = new Date();
+      const set: Partial<typeof orders.$inferInsert> = { updatedAt: now };
+
+      if (telegramPayment) {
+        if (action !== "pay" || !cfg) return { error: "invalid_state" as const };
+        const [user] = await tx.select({ tgId: users.tgId }).from(users).where(eq(users.id, o.userId)).limit(1);
+        const expected = expectedTelegramPayment(o, cfg.starsPerUnit);
+        if (
+          !user ||
+          user.tgId !== telegramPayment.telegramUserId ||
+          !expected ||
+          expected.currency !== telegramPayment.currency ||
+          expected.amount !== telegramPayment.totalAmount
+        ) {
+          return { error: "payment_mismatch" as const };
+        }
+      }
+
+      if (action === "pay") {
+        if (o.paymentStatus === "paid" || o.status === "cancelled") return { error: "invalid_state" as const };
+        if (o.stockDeducted && (!o.stockReservedUntil || o.stockReservedUntil <= now)) {
+          const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, o.id));
+          for (const item of items) {
+            await adjustStock(tx, item, item.quantity);
+          }
+          if (o.promoCode) {
+            await tx
+              .update(promoCodes)
+              .set({ used: sql`greatest(${promoCodes.used} - 1, 0)` })
+              .where(eq(promoCodes.code, o.promoCode));
+          }
+          await tx
+            .update(orders)
+            .set({ status: "cancelled", stockDeducted: false, stockReservedUntil: null, updatedAt: now })
+            .where(eq(orders.id, o.id));
+          return { error: "reservation_expired" as const };
+        }
+
+        if (!o.stockDeducted) {
+          const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, o.id));
+          for (const item of items) {
+            if (!(await adjustStock(tx, item, -item.quantity))) throw new StockUnavailableError();
+          }
+          set.stockDeducted = true;
+        }
+        set.paymentStatus = "paid";
+        set.paidAt = now;
+        set.stockReservedUntil = null;
+        if (o.status === "new") set.status = "paid";
+      } else if (action === "processing") {
+        if (o.status !== "paid") return { error: "invalid_state" as const };
+        set.status = "processing";
+      } else if (action === "shipped") {
+        if (!["paid", "processing"].includes(o.status)) return { error: "invalid_state" as const };
+        set.status = "shipped";
+      } else if (action === "completed") {
+        if (!["paid", "processing", "shipped"].includes(o.status)) return { error: "invalid_state" as const };
+        set.status = "completed";
+      } else if (action === "cancel") {
+        if (["completed", "cancelled"].includes(o.status)) return { error: "invalid_state" as const };
+        set.status = "cancelled";
+        set.stockReservedUntil = null;
+        if (o.stockDeducted) {
+          const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, o.id));
+          for (const item of items) {
+            await adjustStock(tx, item, item.quantity);
+          }
+          set.stockDeducted = false;
+        }
+        if (o.paymentStatus === "unpaid" && o.promoCode) {
+          await tx
+            .update(promoCodes)
+            .set({ used: sql`greatest(${promoCodes.used} - 1, 0)` })
+            .where(eq(promoCodes.code, o.promoCode));
+        }
+      }
+      const [updated] = await tx.update(orders).set(set).where(eq(orders.id, o.id)).returning();
+      if (!updated) return { error: "not_found" as const };
+      return { order: updated };
+    });
+  } catch (error) {
+    if (error instanceof StockUnavailableError) return { error: "out_of_stock" as const };
+    throw error;
+  }
 
   if ("error" in result) return result;
 
@@ -284,6 +430,7 @@ export async function attachReceipt(orderId: number, fileId: string) {
 }
 
 export async function findPendingManualOrder(userId: number) {
+  await releaseExpiredStockReservations();
   const [o] = await db
     .select()
     .from(orders)

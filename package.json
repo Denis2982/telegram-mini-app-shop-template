@@ -5,6 +5,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:baseline": "node scripts/db-baseline.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },

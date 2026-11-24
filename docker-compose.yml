@@ -17,8 +17,8 @@ services:
     build: .
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file: .env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
@@ -26,6 +26,17 @@ services:
       - uploads:/app/public/uploads
     ports:
       - "3000:3000"
+
+  migrate:
+    build: .
+    command: ["npm", "run", "db:migrate"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/app_db
 
 volumes:
   pgdata:
