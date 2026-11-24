@@ -1,5 +1,5 @@
 import { fail, json, withAdmin } from "@/server/http";
-import { updateProductAdmin } from "@/server/services/product.service";
+import { deleteProductAdmin, updateProductAdmin } from "@/server/services/product.service";
 
 export const dynamic = "force-dynamic";
 
@@ -59,5 +59,12 @@ export const PATCH = withAdmin<{ params: Promise<{ id: string }> }>(async (req, 
     patch.images = images.map((image) => image.trim()).filter(Boolean);
   }
   await updateProductAdmin(Number(id), patch);
+  return json({ ok: true });
+});
+
+export const DELETE = withAdmin<{ params: Promise<{ id: string }> }>(async (_req, { params }) => {
+  const { id } = await params;
+  if (!Number.isInteger(Number(id))) return fail("Bad id");
+  await deleteProductAdmin(Number(id));
   return json({ ok: true });
 });

@@ -28,7 +28,7 @@ export function MainAction({ text, visible = true, disabled, loading, onClick }:
       <button
         onClick={onClick}
         disabled={disabled || loading}
-        className="pointer-events-auto w-full rounded-xl bg-tg-button px-4 py-3.5 text-base font-semibold text-tg-button-text shadow-lg transition active:scale-[0.98] disabled:opacity-50"
+        className="pointer-events-auto w-full cursor-pointer rounded-xl bg-tg-button px-4 py-3.5 text-base font-semibold text-tg-button-text shadow-lg transition hover:brightness-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? "…" : text}
       </button>

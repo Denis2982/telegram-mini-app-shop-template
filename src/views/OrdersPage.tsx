@@ -21,7 +21,7 @@ export function OrdersPage({ onBack, onOpen }: { onBack: () => void; onOpen: (id
         {orders === null && <p className="py-20 text-center text-tg-hint">{t("catalog.loading")}</p>}
         {orders?.length === 0 && <p className="py-20 text-center text-tg-hint">🧾 {t("orders.empty")}</p>}
         {orders?.map((o) => (
-          <button key={o.id} onClick={() => onOpen(o.id)} className="w-full rounded-2xl bg-tg-bg p-4 text-left shadow-sm active:scale-[0.99]">
+          <button key={o.id} onClick={() => onOpen(o.id)} className="w-full cursor-pointer rounded-2xl bg-tg-bg p-4 text-left shadow-sm transition hover:bg-tg-secondary active:scale-[0.99]">
             <div className="flex items-center justify-between">
               <span className="font-bold">{t("order.title", { id: o.id })}</span>
               <span className={`rounded-full px-3 py-1 text-xs font-medium ${o.status === "cancelled" ? "bg-red-100 text-red-700" : o.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-tg-secondary"}`}>

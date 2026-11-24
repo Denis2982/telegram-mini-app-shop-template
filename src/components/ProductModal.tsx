@@ -40,7 +40,7 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="sheet-up relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-tg-bg pb-28">
-        <button onClick={onClose} aria-label={t("product.close")} className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/50 text-white">
+        <button onClick={onClose} aria-label={t("product.close")} className="absolute right-3 top-3 z-10 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-black/50 text-white transition hover:bg-black/70 active:scale-95">
           ✕
         </button>
 
@@ -90,7 +90,7 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
                       setQty(1);
                     }}
                     disabled={!v.inStock}
-                    className={`rounded-xl border px-3.5 py-2 text-sm transition ${
+                    className={`cursor-pointer rounded-xl border px-3.5 py-2 text-sm transition hover:brightness-95 ${
                       v.id === variantId ? "border-tg-button bg-tg-button font-semibold text-tg-button-text" : "border-black/10 bg-tg-secondary"
                     } ${v.inStock ? "" : "line-through opacity-40"}`}
                   >
@@ -138,9 +138,9 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
 export function Stepper({ value, max, onChange }: { value: number; max: number; onChange: (n: number) => void }) {
   return (
     <div className="inline-flex items-center rounded-xl bg-tg-secondary">
-      <button onClick={() => onChange(Math.max(0, value - 1))} className="h-9 w-9 text-xl active:opacity-60">−</button>
+      <button onClick={() => onChange(Math.max(0, value - 1))} className="h-9 w-9 cursor-pointer rounded-l-xl text-xl transition hover:bg-tg-bg active:opacity-60">−</button>
       <span className="min-w-8 text-center text-[15px] font-semibold">{value}</span>
-      <button onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="h-9 w-9 text-xl active:opacity-60 disabled:opacity-30">+</button>
+      <button onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} className="h-9 w-9 cursor-pointer rounded-r-xl text-xl transition hover:bg-tg-bg active:opacity-60 disabled:cursor-not-allowed disabled:opacity-30">+</button>
     </div>
   );
 }

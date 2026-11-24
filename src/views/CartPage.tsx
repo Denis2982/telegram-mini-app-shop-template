@@ -26,7 +26,7 @@ export function CartPage({
         <div className="flex flex-col items-center gap-4 px-6 py-24 text-center">
           <div className="text-6xl">🛒</div>
           <p className="text-lg text-tg-hint">{t("cart.empty")}</p>
-          <button onClick={onBack} className="rounded-xl bg-tg-button px-6 py-3 font-semibold text-tg-button-text">
+          <button onClick={onBack} className="cursor-pointer rounded-xl bg-tg-button px-6 py-3 font-semibold text-tg-button-text transition hover:brightness-95 active:scale-[0.98]">
             {t("cart.goCatalog")}
           </button>
         </div>
@@ -47,7 +47,7 @@ export function CartPage({
                       <p className="line-clamp-2 text-[15px] font-medium leading-snug">{l.name}</p>
                       {l.variantName && <p className="text-xs text-tg-hint">{l.variantName}</p>}
                     </div>
-                    <button onClick={() => remove(l.key)} aria-label={t("cart.remove")} className="text-tg-hint">✕</button>
+                    <button onClick={() => remove(l.key)} aria-label={t("cart.remove")} className="cursor-pointer rounded-full p-1 text-tg-hint transition hover:bg-tg-secondary hover:text-tg-text">✕</button>
                   </div>
                   <div className="mt-auto flex items-center justify-between pt-2">
                     <Stepper value={l.qty} max={l.maxStock} onChange={(n) => setQty(l.key, n)} />

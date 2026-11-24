@@ -246,6 +246,65 @@ export async function updateProductAdmin(
   await db.update(products).set(set).where(eq(products.id, id));
 }
 
+export async function deleteProductAdmin(id: number) {
+  const deleted = await db.delete(products).where(eq(products.id, id)).returning({ id: products.id });
+  if (!deleted.length) throw new HttpError("Product not found", 404);
+}
+
+export async function listAdminCategories() {
+  const rows = await db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.id));
+  const productRows = await db
+    .select({ categoryId: products.categoryId })
+    .from(products)
+    .where(sql`${products.categoryId} is not null`);
+  const counts = new Map<number, number>();
+  for (const row of productRows) {
+    if (row.categoryId !== null) counts.set(row.categoryId, (counts.get(row.categoryId) ?? 0) + 1);
+  }
+  return rows.map((category) => ({
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    parentId: category.parentId,
+    productCount: counts.get(category.id) ?? 0,
+  }));
+}
+
+export async function renameCategoryAdmin(id: number, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) throw new HttpError("Category name is required", 400);
+  const [duplicate] = await db.select({ id: categories.id }).from(categories).where(eq(categories.name, trimmed)).limit(1);
+  if (duplicate && duplicate.id !== id) throw new HttpError("Category already exists", 409);
+
+  const baseSlug = slugify(trimmed) || `category-${id}`;
+  let slug = baseSlug;
+  let suffix = 2;
+  while (true) {
+    const [existing] = await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, slug)).limit(1);
+    if (!existing || existing.id === id) break;
+    slug = `${baseSlug}-${suffix++}`;
+  }
+  const updated = await db
+    .update(categories)
+    .set({ name: trimmed, slug })
+    .where(eq(categories.id, id))
+    .returning({ id: categories.id });
+  if (!updated.length) throw new HttpError("Category not found", 404);
+}
+
+export async function deleteCategoryAdmin(id: number) {
+  const [category] = await db.select({ id: categories.id }).from(categories).where(eq(categories.id, id)).limit(1);
+  if (!category) throw new HttpError("Category not found", 404);
+
+  const [product] = await db.select({ id: products.id }).from(products).where(eq(products.categoryId, id)).limit(1);
+  if (product) throw new HttpError("Category contains products", 409);
+
+  const [child] = await db.select({ id: categories.id }).from(categories).where(eq(categories.parentId, id)).limit(1);
+  if (child) throw new HttpError("Category contains subcategories", 409);
+
+  await db.delete(categories).where(eq(categories.id, id));
+}
+
 /** Decrease stock of a product or variant (never below zero). */
 export async function adjustStock(
   tx: Pick<typeof db, "update">,

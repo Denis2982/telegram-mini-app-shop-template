@@ -35,7 +35,7 @@ export function CatalogPage({ onCart, onOrders }: { onCart: () => void; onOrders
   const children = topId ? categories.filter((c) => c.parentId === topId) : [];
 
   const chip = (active: boolean) =>
-    `shrink-0 rounded-full px-4 py-1.5 text-sm transition ${active ? "bg-tg-button font-semibold text-tg-button-text" : "bg-tg-bg"}`;
+    `shrink-0 cursor-pointer rounded-full px-4 py-1.5 text-sm transition hover:brightness-95 ${active ? "bg-tg-button font-semibold text-tg-button-text" : "bg-tg-bg"}`;
 
   const count = cartCount(lines);
 
@@ -79,7 +79,7 @@ export function CatalogPage({ onCart, onOrders }: { onCart: () => void; onOrders
                 <option key={s} value={s}>{t(`sort.${s}`)}</option>
               ))}
             </select>
-            <button onClick={() => { setQ(""); resetFilters(); }} className="shrink-0 px-2 text-sm text-tg-link">{t("catalog.reset")}</button>
+            <button onClick={() => { setQ(""); resetFilters(); }} className="shrink-0 cursor-pointer rounded-lg px-2 py-1 text-sm text-tg-link transition hover:bg-tg-secondary">{t("catalog.reset")}</button>
           </div>
         </div>
       )}

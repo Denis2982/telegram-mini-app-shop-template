@@ -7,7 +7,7 @@ import { translate, type Dict } from "@/lib/i18n";
 import type { OrderDto, ProductDto, PromoCodeDto, PromoDiscountType, StoreSettingsDto } from "@/types";
 import Link from 'next/link'
 
-type Tab = "orders" | "products" | "io" | "promos" | "settings";
+type Tab = "orders" | "products" | "categories" | "io" | "promos" | "settings";
 
 export default function AdminPage() {
   const [dict, setDict] = useState<Dict>({});
@@ -35,6 +35,8 @@ export default function AdminPage() {
   const [editingVariantProduct, setEditingVariantProduct] = useState<ProductDto | null>(null);
   const [createProductOpen, setCreateProductOpen] = useState(false);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [categoryRows, setCategoryRows] = useState<{ id: number; name: string; slug: string; parentId: number | null; productCount: number }[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [promoForm, setPromoForm] = useState({
     code: "",
     discountType: "percent" as PromoDiscountType,
@@ -67,9 +69,35 @@ export default function AdminPage() {
       if (!o.ok || !p.ok) return false;
       setOrders(await o.json());
       setProducts(await p.json());
+      const categoryResponse = await call("/api/admin/categories", {}, k);
+      if (categoryResponse.ok) setCategoryRows(await categoryResponse.json());
+      const publicCategories = await call("/api/categories", {}, k);
+      if (publicCategories.ok) setCategories(await publicCategories.json());
       return true;
     },
     [call, key],
+  );
+
+  const loadCategories = useCallback(
+    async (k = key) => {
+      setCategoriesLoading(true);
+      try {
+        const [adminResponse, publicResponse] = await Promise.all([
+          call("/api/admin/categories", {}, k),
+          call("/api/categories", {}, k),
+        ]);
+        if (!adminResponse.ok) {
+          const data = await adminResponse.json().catch(() => ({ error: t("admin.categoriesLoadError") }));
+          setMsg(data.error ?? t("admin.categoriesLoadError"));
+          return;
+        }
+        setCategoryRows(await adminResponse.json());
+        if (publicResponse.ok) setCategories(await publicResponse.json());
+      } finally {
+        setCategoriesLoading(false);
+      }
+    },
+    [call, key, t],
   );
 
   const loadSettings = useCallback(
@@ -160,6 +188,50 @@ export default function AdminPage() {
 
     return () => clearInterval(interval)
   }, [authed, key, load]);
+
+  const deleteProduct = async (product: ProductDto) => {
+    if (!window.confirm(t("admin.deleteProductConfirm", { name: product.name }))) return;
+    const response = await call(`/api/admin/products/${product.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: t("admin.productDeleteError") }));
+      setMsg(data.error ?? t("admin.productDeleteError"));
+      return;
+    }
+    setMsg(t("admin.productDeleted"));
+    await load();
+  };
+
+  const renameCategory = async (category: { id: number; name: string }) => {
+    const name = window.prompt(t("admin.renameCategoryPrompt"), category.name)?.trim();
+    if (!name || name === category.name) return;
+    const response = await call(`/api/admin/categories/${category.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: t("admin.categoryRenameError") }));
+      setMsg(data.error ?? t("admin.categoryRenameError"));
+      return;
+    }
+    setMsg(t("admin.categoryRenamed"));
+    await loadCategories();
+  };
+
+  const deleteCategory = async (category: { id: number; name: string; productCount: number }) => {
+    if (category.productCount > 0) {
+      setMsg(t("admin.categoryHasProducts"));
+      return;
+    }
+    if (!window.confirm(t("admin.deleteCategoryConfirm", { name: category.name }))) return;
+    const response = await call(`/api/admin/categories/${category.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ error: t("admin.categoryDeleteError") }));
+      setMsg(data.error ?? t("admin.categoryDeleteError"));
+      return;
+    }
+    setMsg(t("admin.categoryDeleted"));
+    await loadCategories();
+  };
 
   const login = async () => {
     const ok = await load(key);
@@ -349,7 +421,7 @@ export default function AdminPage() {
         <div className="w-full space-y-3 rounded-2xl bg-white p-6 shadow">
           <h1 className="text-xl font-bold">{t("admin.panelTitle")}</h1>
           <input type="password" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} placeholder="ADMIN_API_KEY" className="w-full rounded-xl bg-slate-100 px-4 py-3 outline-none" />
-          <button onClick={login} className="w-full rounded-xl bg-blue-600 py-3 font-semibold text-white">{t("admin.login")}</button>
+          <button onClick={login} className="w-full rounded-xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 active:scale-[0.99]">{t("admin.login")}</button>
           {msg && <p className="text-sm text-red-600">{msg}</p>}
           <p className="text-xs text-slate-500">{t("admin.demoMode")} <code>admin</code></p>
         </div>
@@ -363,8 +435,9 @@ export default function AdminPage() {
         setTab(t);
         if (t === "settings") void loadSettings();
         if (t === "promos") void loadPromos();
+        if (t === "categories") void loadCategories();
       }}
-      className={`cursor-pointer rounded-full px-4 py-2 text-sm ${tab === t ? "bg-blue-600 font-semibold text-white" : "bg-white"}`}
+      className={`cursor-pointer rounded-full px-4 py-2 text-sm transition ${tab === t ? "bg-blue-600 font-semibold text-white hover:bg-blue-700" : "bg-white hover:bg-slate-100"}`}
     >
       {label}
     </button>
@@ -378,8 +451,9 @@ export default function AdminPage() {
         {tabBtn("products", `${t("admin.products")} (${products.length})`)}
         {tabBtn("io", t("admin.io"))}
         {tabBtn("promos", `${t("admin.promos")} (${promos.length})`)}
+        {tabBtn("categories", t("admin.categories"))}
         {tabBtn("settings", t("admin.settings"))}
-        <Link href="/" className="ml-auto cursor-pointer text-sm text-blue-600">
+        <Link href="/" className="ml-auto cursor-pointer rounded-lg px-2 py-1 text-sm text-blue-600 transition hover:bg-blue-50">
           ← {t("admin.storefront")}
         </Link>
       </div>
@@ -420,7 +494,7 @@ export default function AdminPage() {
           <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
-              <tr><th className="p-3">{t("admin.productSku")}</th><th className="p-3">{t("admin.productPhoto")}</th><th className="p-3">{t("admin.productName")}</th><th className="p-3">{t("admin.productCategory")}</th><th className="p-3">{t("admin.productPrice")}</th><th className="p-3">{t("admin.productStock")}</th><th className="p-3">{t("admin.productActive")}</th></tr>
+              <tr><th className="p-3">{t("admin.productSku")}</th><th className="p-3">{t("admin.productPhoto")}</th><th className="p-3">{t("admin.productName")}</th><th className="p-3">{t("admin.productCategory")}</th><th className="p-3">{t("admin.productPrice")}</th><th className="p-3">{t("admin.productStock")}</th><th className="p-3">{t("admin.productActive")}</th><th className="p-3">{t("admin.promoActions")}</th></tr>
             </thead>
             <tbody>
               {products.map((p) => (
@@ -449,7 +523,7 @@ export default function AdminPage() {
                         <button
                           type="button"
                           onClick={() => setEditingVariantProduct(p)}
-                          className="cursor-pointer text-xs font-medium text-blue-700"
+                          className="cursor-pointer rounded-lg px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-50"
                         >
                           {t("admin.editVariants")}
                         </button>
@@ -458,12 +532,59 @@ export default function AdminPage() {
                     {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">{t("admin.productOut")}</span>}
                   </td>
                   <td className="p-3"><input type="checkbox" className="cursor-pointer" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
+                  <td className="p-3"><Btn danger onClick={() => void deleteProduct(p)}>{t("admin.delete")}</Btn></td>
                 </tr>
               ))}
             </tbody>
           </table>
           </div>
         </div>
+      )}
+
+      {tab === "categories" && (
+        <section className="space-y-4 rounded-2xl bg-white p-4 shadow-sm">
+          <div>
+            <h2 className="font-semibold">{t("admin.categories")}</h2>
+            <p className="mt-1 text-sm text-slate-500">{t("admin.categoriesHint")}</p>
+          </div>
+          {categoriesLoading ? (
+            <p className="text-sm text-slate-500">{t("admin.loading")}</p>
+          ) : categoryRows.length === 0 ? (
+            <p className="text-sm text-slate-500">{t("admin.noCategories")}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="p-3">{t("admin.productCategory")}</th>
+                    <th className="p-3">{t("admin.categoryProductCount")}</th>
+                    <th className="p-3">{t("admin.promoActions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryRows.map((category) => (
+                    <tr key={category.id} className="border-t border-slate-100">
+                      <td className="p-3 font-medium">{category.name}</td>
+                      <td className="p-3">{category.productCount}</td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Btn onClick={() => void renameCategory(category)}>{t("admin.edit")}</Btn>
+                          <Btn
+                            danger
+                            disabled={category.productCount > 0}
+                            onClick={() => void deleteCategory(category)}
+                          >
+                            {t("admin.delete")}
+                          </Btn>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       )}
 
       {tab === "io" && (
@@ -904,7 +1025,7 @@ function CreateProductModal({
                 <div key={image} className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={image} alt="" className="h-16 w-16 rounded-lg bg-slate-100 object-cover" />
-                  <button type="button" onClick={() => setImages((current) => current.filter((url) => url !== image))} className="absolute right-0 top-0 grid h-5 w-5 -translate-y-1/3 translate-x-1/3 place-items-center rounded-full bg-red-600 text-xs text-white">×</button>
+                  <button type="button" onClick={() => setImages((current) => current.filter((url) => url !== image))} className="absolute right-0 top-0 grid h-5 w-5 -translate-y-1/3 translate-x-1/3 place-items-center rounded-full bg-red-600 text-xs text-white transition hover:bg-red-700 active:scale-95">×</button>
                 </div>
               ))}
             </div>
@@ -1068,7 +1189,7 @@ function ProductImageEditor({
           type="button"
           disabled={uploading}
           onClick={() => fileInput.current?.click()}
-          className="cursor-pointer text-left text-xs font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-lg px-1 py-1 text-left text-xs font-medium text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {uploading ? t("admin.loading") : imageUrl && !previewFailed ? `📷 ${t("admin.replacePhoto")}` : `📷 ${t("admin.addPhoto")}`}
         </button>
@@ -1079,7 +1200,7 @@ function ProductImageEditor({
 
 function Btn({ children, onClick, danger, disabled }: { children: React.ReactNode; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${disabled ? "" : "cursor-pointer"} ${danger ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>
+    <button onClick={onClick} disabled={disabled} className={`shrink-0 rounded-xl px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${disabled ? "" : "cursor-pointer"} ${danger ? "bg-red-50 text-red-700 hover:bg-red-100" : "bg-blue-50 text-blue-700 hover:bg-blue-100"} active:scale-[0.98]`}>
       {children}
     </button>
   );

@@ -139,14 +139,14 @@ export function OrderStatus({
                       if (wa?.openTelegramLink) wa.openTelegramLink(url);
                       else window.open(url, "_blank");
                     }}
-                    className="w-full rounded-xl bg-tg-button px-4 py-3 font-semibold text-tg-button-text"
+                    className="w-full cursor-pointer rounded-xl bg-tg-button px-4 py-3 font-semibold text-tg-button-text transition hover:brightness-95 active:scale-[0.98]"
                   >
                     📎 {t("order.openBot")}
                   </button>
                 )}
               </>
             ) : (
-              <button onClick={pay} className="w-full rounded-xl bg-tg-button px-4 py-3 font-semibold text-tg-button-text">
+              <button onClick={pay} className="w-full cursor-pointer rounded-xl bg-tg-button px-4 py-3 font-semibold text-tg-button-text transition hover:brightness-95 active:scale-[0.98]">
                 {order.paymentMethod === "manual" ? t("order.manualTitle") : `${t("order.payNow")} · ${money(order.total)}`}
               </button>
             )}
@@ -186,7 +186,7 @@ export function OrderStatus({
           <p><span className="text-tg-hint">{t("order.payment")}: </span>{t(`pay.${order.paymentMethod}`)}</p>
         </section>
 
-        <button onClick={onCatalog} className="w-full rounded-xl bg-tg-bg px-4 py-3 font-semibold text-tg-link shadow-sm">
+        <button onClick={onCatalog} className="w-full cursor-pointer rounded-xl bg-tg-bg px-4 py-3 font-semibold text-tg-link shadow-sm transition hover:bg-tg-secondary active:scale-[0.99]">
           {t("order.back")}
         </button>
       </div>

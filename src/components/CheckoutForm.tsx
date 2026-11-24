@@ -108,7 +108,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
   };
 
   const radio = (active: boolean) =>
-    `flex-1 rounded-xl border px-3 py-2.5 text-center text-sm transition ${active ? "border-tg-button bg-tg-button font-semibold text-tg-button-text" : "border-black/10 bg-tg-secondary"}`;
+    `flex-1 cursor-pointer rounded-xl border px-3 py-2.5 text-center text-sm transition hover:brightness-95 active:scale-[0.98] ${active ? "border-tg-button bg-tg-button font-semibold text-tg-button-text" : "border-black/10 bg-tg-secondary"}`;
 
   return (
     <div className="space-y-3">
@@ -117,7 +117,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
         <div className="flex gap-2">
           <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("checkout.phone")} inputMode="tel" autoComplete="tel" />
           {getWebApp()?.initData && (
-            <button onClick={requestPhone} className="shrink-0 rounded-xl bg-tg-secondary px-3 text-xs font-medium text-tg-link">
+            <button onClick={requestPhone} className="shrink-0 cursor-pointer rounded-xl bg-tg-secondary px-3 py-2 text-xs font-medium text-tg-link transition hover:bg-tg-bg">
               📱 {t("checkout.requestPhone")}
             </button>
           )}
@@ -146,7 +146,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
       <Section title={t("checkout.promo")}>
         <div className="flex gap-2">
           <input className={`${inputCls} uppercase`} value={promoInput} onChange={(e) => setPromoInput(e.target.value)} placeholder={t("checkout.promoPlaceholder")} />
-          <button onClick={applyPromo} className="shrink-0 rounded-xl bg-tg-button px-4 text-sm font-semibold text-tg-button-text">
+          <button onClick={applyPromo} className="shrink-0 cursor-pointer rounded-xl bg-tg-button px-4 text-sm font-semibold text-tg-button-text transition hover:brightness-95 active:scale-[0.98]">
             {t("checkout.apply")}
           </button>
         </div>

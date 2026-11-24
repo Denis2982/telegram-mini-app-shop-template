@@ -36,7 +36,7 @@ export function ProductCard({ product, onOpen }: { product: ProductDto; onOpen: 
         <button
           onClick={onAdd}
           disabled={!product.inStock}
-          className="mt-auto cursor-pointer rounded-xl bg-tg-button px-3 py-2 text-sm font-semibold text-tg-button-text transition disabled:cursor-not-allowed disabled:bg-tg-secondary disabled:text-tg-hint"
+          className="mt-auto cursor-pointer rounded-xl bg-tg-button px-3 py-2 text-sm font-semibold text-tg-button-text transition hover:brightness-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-tg-secondary disabled:text-tg-hint"
         >
           {product.inStock ? t("product.add") : t("product.outOfStock")}
         </button>
