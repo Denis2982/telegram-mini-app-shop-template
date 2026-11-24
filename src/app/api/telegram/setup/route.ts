@@ -17,6 +17,7 @@ export const POST = withAdmin(async () => {
   const cfg = getConfig();
   if (!bot) return fail("BOT_TOKEN is not set", 503);
   if (!cfg.miniAppUrl) return fail("TELEGRAM_MINI_APP_URL is not set", 400);
+  if (!cfg.webhookSecret) return fail("TELEGRAM_WEBHOOK_SECRET is not set", 400);
   const url = `${cfg.miniAppUrl}/api/telegram/webhook`;
   await bot.api.setWebhook(url, {
     secret_token: cfg.webhookSecret,

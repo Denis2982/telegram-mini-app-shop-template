@@ -127,7 +127,7 @@ export default function AdminPage() {
         setSettingsLoading(false);
       }
     },
-    [call, key],
+    [call, key, t],
   );
 
   const loadPromos = useCallback(
@@ -150,7 +150,7 @@ export default function AdminPage() {
         setPromosLoading(false);
       }
     },
-    [call, key],
+    [call, key, t],
   );
 
   useEffect(() => {
@@ -623,7 +623,7 @@ export default function AdminPage() {
                 📁 {t("admin.chooseFile")}
                 <input
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.csv"
                   className="sr-only"
                   onChange={(event) => {
                     const file = event.currentTarget.files?.[0];

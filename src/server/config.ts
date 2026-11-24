@@ -28,22 +28,23 @@ export const SUPPORTED_LOCALES = ["ru", "en"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export function getConfig() {
+  const isProduction = process.env.NODE_ENV === "production";
   const botToken = env("BOT_TOKEN");
   return {
     botToken,
     miniAppUrl: env("TELEGRAM_MINI_APP_URL").replace(/\/$/, ""),
     botUsername: env("BOT_USERNAME").replace(/^@/, ""),
     supportUsername: env("SUPPORT_USERNAME").replace(/^@/, ""),
-    webhookSecret: env("TELEGRAM_WEBHOOK_SECRET", "tma-shop-secret"),
+    webhookSecret: env("TELEGRAM_WEBHOOK_SECRET", isProduction ? "" : "tma-shop-secret"),
     adminChatId: env("ADMIN_CHAT_ID"),
     adminIds: env("ADMIN_IDS")
       .split(",")
       .map((s) => Number(s.trim()))
       .filter((n) => Number.isFinite(n) && n > 0),
-    /** Key for the web admin panel (/admin). In demo mode without BOT_TOKEN defaults to "admin". */
-    adminApiKey: env("ADMIN_API_KEY", botToken ? "" : "admin"),
-    allowDevAuth: flag("ALLOW_DEV_AUTH", !botToken),
-    seedDemo: flag("SEED_DEMO_DATA", true),
+    /** Key for the web admin panel (/admin). In local demo mode it defaults to "admin". */
+    adminApiKey: env("ADMIN_API_KEY", isProduction || botToken ? "" : "admin"),
+    allowDevAuth: isProduction ? false : flag("ALLOW_DEV_AUTH", !botToken),
+    seedDemo: isProduction ? false : flag("SEED_DEMO_DATA", true),
 
     storeName: env("STORE_NAME", "Commercial Shop"),
     currencyCode: env("CURRENCY_CODE", "RUB"),
@@ -58,7 +59,7 @@ export function getConfig() {
     starsPerUnit: num("STARS_PER_UNIT", 0.5),
     manualDetails: env(
       "MANUAL_PAYMENT_DETAILS",
-      "Сбербанк: 0000 0000 0000 0000\nПолучатель: Иван И.\nВ комментарии укажите номер заказа",
+      isProduction ? "" : "Сбербанк: 0000 0000 0000 0000\nПолучатель: Иван И.\nВ комментарии укажите номер заказа",
     ),
 
     courierFee: num("DELIVERY_COURIER_FEE", 300),
