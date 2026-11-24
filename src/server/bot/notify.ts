@@ -71,7 +71,7 @@ export async function adminCardText(order: DbOrder, items: DbOrderItem[], user: 
     lines.push(t("admin.promo", { code: esc(order.promoCode), discount: formatMoney(order.discount, cfg) }));
   }
   if (order.comment) lines.push(t("admin.comment", { comment: esc(order.comment) }));
-  lines.push(t("admin.total", { total: formatMoney(order.total, cfg) }));
+  lines.push(t("admin.orderTotal", { total: formatMoney(order.total, cfg) }));
   return lines.join("\n");
 }
 

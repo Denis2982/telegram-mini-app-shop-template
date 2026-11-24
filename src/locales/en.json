@@ -256,7 +256,7 @@
   "admin.payment": "💳 {method} — {state}",
   "admin.promo": "🏷 Promo code: {code} (−{discount})",
   "admin.comment": "💬 {comment}",
-  "admin.total": "💰 <b>Total: {total}</b>",
+  "admin.orderTotal": "💰 <b>Total: {total}</b>",
   "admin.receipt": "📎 Payment receipt for order #{id}",
   "admin.btn.pay": "💳 Confirm payment",
   "admin.btn.processing": "📦 Pack",

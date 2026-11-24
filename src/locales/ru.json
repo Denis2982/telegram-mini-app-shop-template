@@ -256,7 +256,7 @@
   "admin.payment": "💳 {method} — {state}",
   "admin.promo": "🏷 Промокод: {code} (−{discount})",
   "admin.comment": "💬 {comment}",
-  "admin.total": "💰 <b>Итого: {total}</b>",
+  "admin.orderTotal": "💰 <b>Итого: {total}</b>",
   "admin.receipt": "📎 Чек от покупателя к заказу №{id}",
   "admin.btn.pay": "💳 Подтвердить оплату",
   "admin.btn.processing": "📦 В сборку",
