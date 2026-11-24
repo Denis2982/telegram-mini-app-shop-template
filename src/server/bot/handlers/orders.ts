@@ -16,7 +16,7 @@ export function registerOrders(bot: Bot) {
     const cfg = await getEffectiveConfig();
     const lines = list.map(
       (o) =>
-        `<b>№${o.id}</b> · ${esc(tr(lang, `status.${o.status}`))} · ${formatMoney(o.total, cfg)}\n` +
+        `<b>№${o.id}</b> · ${esc(tr(lang, `status.${o.status}`))} · ${formatMoney(o.total, cfg, lang)}\n` +
         o.items.map((i) => `   ${esc(i.name)}${i.variantName ? ` (${esc(i.variantName)})` : ""} × ${i.quantity}`).join("\n"),
     );
     await ctx.reply(`${tr(lang, "bot.myOrdersTitle")}\n\n${lines.join("\n\n")}`, { parse_mode: "HTML" });

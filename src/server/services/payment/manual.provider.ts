@@ -24,7 +24,7 @@ export class ManualProvider implements IPaymentProvider {
           user.tgId,
           tr(user.languageCode, "bot.manualInstructions", {
             id: order.id,
-            total: formatMoney(order.total, cfg),
+            total: formatMoney(order.total, cfg, user.languageCode ?? undefined),
             details: esc(details),
           }),
           { parse_mode: "HTML" },

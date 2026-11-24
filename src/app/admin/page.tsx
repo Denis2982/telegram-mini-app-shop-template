@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getWebApp } from "@/hooks/useTelegram";
 import { api } from "@/api/client";
 import { translate, type Dict } from "@/lib/i18n";
+import { formatAmount } from "@/lib/format";
 import type { OrderDto, ProductDto, PromoCodeDto, PromoDiscountType, StoreSettingsDto } from "@/types";
 import Link from 'next/link'
 
@@ -12,6 +13,11 @@ type Tab = "orders" | "products" | "categories" | "io" | "promos" | "settings";
 export default function AdminPage() {
   const [dict, setDict] = useState<Dict>({});
   const t = useCallback((key: string, vars?: Record<string, string | number>) => translate(dict, key, vars), [dict]);
+  const [moneyLocale, setMoneyLocale] = useState({ locale: "ru", currencySymbol: "₽" });
+  const money = useCallback(
+    (amount: number) => formatAmount(amount, moneyLocale.currencySymbol, moneyLocale.locale),
+    [moneyLocale],
+  );
   const [key, setKey] = useState("")
   const restoreAttempted = useRef(false);
   const [authed, setAuthed] = useState(false);
@@ -46,7 +52,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     void api.config(getWebApp()?.initDataUnsafe?.user?.language_code)
-      .then((config) => setDict(config.dict))
+      .then((config) => {
+        setDict(config.dict);
+        setMoneyLocale({ locale: config.locale, currencySymbol: config.currencySymbol });
+      })
       .catch(() => setDict({}));
     void api.categories().then(setCategories).catch(() => setCategories([]));
   }, []);
@@ -481,11 +490,15 @@ export default function AdminPage() {
             <div key={o.id} className="space-y-2 rounded-2xl bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <b>{t("admin.order", { id: o.id })}</b>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">{t(`status.${o.status}`)} · {o.paymentStatus === "paid" ? t("admin.paid") : t("admin.unpaid")} · {o.paymentMethod}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs">
+                  {t(`status.${o.status}`)}
+                  {o.paymentStatus === "unpaid" && ` · ${t("admin.unpaid")}`}
+                  {` · ${t(`pay.${o.paymentMethod}`)}`}
+                </span>
               </div>
-              <p className="text-sm text-slate-600">{o.customerName}, {o.customerPhone} — {o.deliveryMethod}: {o.address}</p>
+              <p className="text-sm text-slate-600">{o.customerName}, {o.customerPhone} — {t(`delivery.${o.deliveryMethod}`)}: {o.address}</p>
               <p className="text-sm">{o.items.map((i) => `${i.name}${i.variantName ? ` (${i.variantName})` : ""} × ${i.quantity}`).join("; ")}</p>
-              <p className="font-semibold">{t("admin.total")} {o.total} {o.currency}</p>
+              <p className="font-semibold">{t("admin.total")} {money(o.total)}</p>
               <div className="flex flex-wrap gap-2">
                 {o.paymentStatus !== "paid" && o.status !== "cancelled" && <Btn onClick={() => act(o.id, "pay")}>{t("admin.btn.pay")}</Btn>}
                 {o.status === "paid" && <Btn onClick={() => act(o.id, "processing")}>{t("admin.btn.processing")}</Btn>}

@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { api } from "@/api/client";
 import { translate } from "@/lib/i18n";
+import { formatAmount } from "@/lib/format";
 import type { CategoryDto, ClientConfig, ProductDto } from "@/types";
 
 export type SortKey = "popular" | "price_asc" | "price_desc" | "new";
@@ -74,8 +75,9 @@ export function useT() {
   const config = useShopStore((s) => s.config);
   const dict = config?.dict ?? {};
   const symbol = config?.currencySymbol ?? "";
+  const locale = config?.locale ?? "ru";
   return {
     t: (key: string, vars?: Record<string, string | number>) => translate(dict, key, vars),
-    money: (n: number) => `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n)} ${symbol}`,
+    money: (n: number) => formatAmount(n, symbol, locale),
   };
 }

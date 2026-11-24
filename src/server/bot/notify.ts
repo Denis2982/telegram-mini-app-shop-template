@@ -58,7 +58,7 @@ export async function adminCardText(order: DbOrder, items: DbOrderItem[], user: 
   lines.push(
     t("admin.payment", {
       method: t(`pay.${order.paymentMethod}`),
-      state: order.paymentStatus === "paid" ? t("order.paid") : t("order.unpaid"),
+      state: order.paymentStatus === "paid" ? "" : ` — ${t("order.unpaid")}`,
     }),
   );
   lines.push("");
@@ -116,7 +116,7 @@ export async function notifyBuyer(order: DbOrder, user: DbUser | null) {
       user.tgId,
       tr(user.languageCode, `bot.notify.${order.status}`, {
         id: order.id,
-        total: formatMoney(order.total, cfg),
+        total: formatMoney(order.total, cfg, user.languageCode ?? undefined),
       }),
     );
   } catch (e) {

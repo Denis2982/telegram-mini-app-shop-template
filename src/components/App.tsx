@@ -36,6 +36,7 @@ export function App() {
 
   useEffect(() => {
     if (config) document.title = config.storeName;
+    if (config) document.documentElement.lang = config.locale;
   }, [config]);
 
   if (!config) {

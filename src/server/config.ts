@@ -1,3 +1,5 @@
+import { formatAmount } from "@/lib/format";
+
 /**
  * Reads and normalises all application settings from environment variables (.env).
  * Evaluated lazily through a getter so values are always fresh at runtime.
@@ -24,7 +26,7 @@ const list = (key: string, fallback: string[] = []) => {
     .filter(Boolean);
 };
 
-export const SUPPORTED_LOCALES = ["ru", "en"] as const;
+export const SUPPORTED_LOCALES = ["ru", "en", "uk"] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 export function getConfig() {
@@ -57,7 +59,7 @@ export function getConfig() {
       : ("ru" as Locale),
 
     paymentProviderToken: env("PAYMENT_PROVIDER_TOKEN"),
-    starsEnabled: flag("TELEGRAM_STARS_ENABLED", true),
+    starsEnabled: flag("TELEGRAM_STARS_ENABLED", false),
     /** How many Stars cost one unit of the store currency. */
     starsPerUnit: num("STARS_PER_UNIT", 0.5),
     manualDetails: env(
@@ -80,9 +82,12 @@ export function pickLocale(code?: string | null): Locale {
   return getConfig().defaultLocale;
 }
 
-export function formatMoney(n: number, cfg: Pick<AppConfig, "currencySymbol"> = getConfig()) {
-  const formatted = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(n);
-  return `${formatted} ${cfg.currencySymbol}`;
+export function formatMoney(
+  n: number,
+  cfg: Pick<AppConfig, "currencySymbol"> = getConfig(),
+  locale: string = getConfig().defaultLocale,
+) {
+  return formatAmount(n, cfg.currencySymbol, pickLocale(locale));
 }
 
 export function deliveryFeeFor(method: string, subtotalAfterDiscount: number, cfg: AppConfig = getConfig()) {
