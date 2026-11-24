@@ -32,6 +32,7 @@ export default function AdminPage() {
   const [promos, setPromos] = useState<PromoCodeDto[]>([]);
   const [promosLoading, setPromosLoading] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<string | null>(null);
+  const [editingVariantProduct, setEditingVariantProduct] = useState<ProductDto | null>(null);
   const [promoForm, setPromoForm] = useState({
     code: "",
     discountType: "percent" as PromoDiscountType,
@@ -430,7 +431,23 @@ export default function AdminPage() {
                   <td className="p-3">{p.categoryName ?? "—"}</td>
                   <td className="p-3"><NumInput key={`price-${p.id}-${p.price}`} value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
                   <td className="p-3">
-                    {p.variants.length ? <span title={p.variants.map((v) => `${v.name}: ${v.stock}`).join(", ")}>{p.stock} ({t("admin.productVariants")})</span> : <NumInput key={`stock-${p.id}-${p.stock}`} value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
+                    {p.variants.length ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={p.stock}
+                          readOnly
+                          aria-label={t("admin.variantStockTitle")}
+                          className="w-20 rounded-lg bg-slate-100 px-2 py-1 text-slate-500 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setEditingVariantProduct(p)}
+                          className="cursor-pointer text-xs font-medium text-blue-700"
+                        >
+                          {t("admin.editVariants")}
+                        </button>
+                      </div>
+                    ) : <NumInput key={`stock-${p.id}-${p.stock}`} value={p.stock} onSave={(v) => patch(p.id, { stock: v })} />}
                     {!p.inStock && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">{t("admin.productOut")}</span>}
                   </td>
                   <td className="p-3"><input type="checkbox" className="cursor-pointer" defaultChecked={p.active} onChange={(e) => patch(p.id, { active: e.target.checked })} /></td>
@@ -645,7 +662,102 @@ export default function AdminPage() {
           )}
         </section>
       )}
+      {editingVariantProduct && (
+        <VariantStockModal
+          product={editingVariantProduct}
+          t={t}
+          onClose={() => setEditingVariantProduct(null)}
+          onSave={async (variants) => {
+            const response = await call(
+              `/api/admin/products/${editingVariantProduct.id}`,
+              { method: "PATCH", body: JSON.stringify({ variants }) },
+            );
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({ error: t("admin.variantStockError") }));
+              throw new Error(data.error ?? t("admin.variantStockError"));
+            }
+            setEditingVariantProduct(null);
+            await load();
+            setMsg(t("admin.variantStockSaved"));
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+function VariantStockModal({
+  product,
+  t,
+  onClose,
+  onSave,
+}: {
+  product: ProductDto;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  onClose: () => void;
+  onSave: (variants: { id: number; stock: number }[]) => Promise<void>;
+}) {
+  const [stocks, setStocks] = useState<Record<number, string>>(
+    Object.fromEntries(product.variants.map((variant) => [variant.id, String(variant.stock)])),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const save = async () => {
+    const variants = product.variants.map((variant) => ({
+      id: variant.id,
+      stock: Math.max(0, Math.floor(Number(stocks[variant.id]) || 0)),
+    }));
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(variants);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t("admin.variantStockError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+        <div>
+          <h2 className="font-semibold">{t("admin.variantStockTitle")}</h2>
+          <p className="mt-1 text-sm text-slate-500">{product.name}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("admin.variantStockHint")}</p>
+        </div>
+        <div className="space-y-2">
+          {product.variants.map((variant) => (
+            <label key={variant.id} className="flex items-center justify-between gap-4 rounded-xl bg-slate-100 px-3 py-2">
+              <span className="text-sm font-medium">{variant.name}</span>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={stocks[variant.id] ?? "0"}
+                onChange={(event) => setStocks((current) => ({ ...current, [variant.id]: event.target.value }))}
+                className="w-24 rounded-lg bg-white px-3 py-2 text-sm outline-none"
+              />
+            </label>
+          ))}
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Btn onClick={onClose} disabled={saving}>{t("admin.cancel")}</Btn>
+          <Btn onClick={() => void save()} disabled={saving}>
+            {saving ? t("admin.saving") : t("admin.variantStockSave")}
+          </Btn>
+        </div>
+      </div>
+    </div>
   );
 }
 

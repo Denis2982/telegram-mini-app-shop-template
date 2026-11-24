@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { categories, productVariants, products } from "@/db/schema";
 import type { CategoryDto, ProductDto } from "@/types";
 import { ensureSeeded } from "../seed";
+import { HttpError } from "../http";
 
 export type ProductSort = "popular" | "price_asc" | "price_desc" | "new";
 
@@ -104,10 +105,55 @@ export async function getProduct(id: number): Promise<ProductDto | null> {
 
 export async function updateProductAdmin(
   id: number,
-  patch: { stock?: number; price?: number; active?: boolean; images?: string[] },
+  patch: {
+    stock?: number;
+    price?: number;
+    active?: boolean;
+    images?: string[];
+    variants?: { id: number; stock: number }[];
+  },
 ) {
+  if (patch.variants) {
+    await db.transaction(async (tx) => {
+      const existing = await tx
+        .select({ id: productVariants.id })
+        .from(productVariants)
+        .where(eq(productVariants.productId, id));
+      const existingIds = new Set(existing.map((variant) => variant.id));
+      const submittedIds = new Set(patch.variants!.map((variant) => variant.id));
+      if (
+        submittedIds.size !== patch.variants!.length ||
+        patch.variants!.some((variant) => !existingIds.has(variant.id)) ||
+        submittedIds.size !== existingIds.size
+      ) {
+        throw new HttpError("Invalid product variant", 400);
+      }
+
+      for (const variant of patch.variants!) {
+        await tx
+          .update(productVariants)
+          .set({ stock: variant.stock })
+          .where(and(eq(productVariants.id, variant.id), eq(productVariants.productId, id)));
+      }
+
+      const totalStock = patch.variants!.reduce((sum, variant) => sum + variant.stock, 0);
+      await tx
+        .update(products)
+        .set({ stock: totalStock, updatedAt: new Date() })
+        .where(eq(products.id, id));
+    });
+  }
+
   const set: Partial<typeof products.$inferInsert> = { updatedAt: new Date() };
-  if (patch.stock !== undefined) set.stock = Math.max(0, Math.floor(patch.stock));
+  if (!patch.variants && patch.stock !== undefined) {
+    const existing = await db
+      .select({ id: productVariants.id })
+      .from(productVariants)
+      .where(eq(productVariants.productId, id))
+      .limit(1);
+    if (existing.length) throw new HttpError("Edit variant stock through variants", 400);
+    set.stock = Math.max(0, Math.floor(patch.stock));
+  }
   if (patch.price !== undefined && patch.price >= 0) set.price = patch.price;
   if (patch.active !== undefined) set.active = patch.active;
   if (patch.images !== undefined) set.images = patch.images;
