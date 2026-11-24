@@ -114,6 +114,7 @@
   "admin.demoMode": "In demo mode (without BOT_TOKEN) the default key is:",
   "admin.login": "Sign in",
   "admin.invalidKey": "Invalid key",
+  "admin.loadError": "Could not load admin data (HTTP {status}). Check Vercel logs.",
   "admin.orders": "Orders",
   "admin.products": "Products",
   "admin.io": "Import / export",

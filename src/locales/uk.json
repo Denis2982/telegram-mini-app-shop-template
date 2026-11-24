@@ -114,6 +114,7 @@
   "admin.demoMode": "У деморежимі (без BOT_TOKEN) ключ за замовчуванням:",
   "admin.login": "Увійти",
   "admin.invalidKey": "Неправильний ключ",
+  "admin.loadError": "Не вдалося завантажити дані панелі (HTTP {status}). Перевірте журнали Vercel.",
   "admin.orders": "Замовлення",
   "admin.products": "Товари",
   "admin.io": "Імпорт / експорт",

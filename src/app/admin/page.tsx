@@ -75,7 +75,16 @@ export default function AdminPage() {
   const load = useCallback(
     async (k = key) => {
       const [o, p] = await Promise.all([call("/api/admin/orders", {}, k), call("/api/admin/products", {}, k)]);
-      if (!o.ok || !p.ok) return false;
+      if (!o.ok || !p.ok) {
+        const failed = !o.ok ? o : p;
+        const forbidden = o.status === 403 || p.status === 403;
+        setMsg(
+          forbidden
+            ? t("admin.invalidKey")
+            : t("admin.loadError", { status: failed.status }),
+        );
+        return false;
+      }
       setOrders(await o.json());
       setProducts(await p.json());
       const categoryResponse = await call("/api/admin/categories", {}, k);
@@ -84,7 +93,7 @@ export default function AdminPage() {
       if (publicCategories.ok) setCategories(await publicCategories.json());
       return true;
     },
-    [call, key],
+    [call, key, t],
   );
 
   const loadCategories = useCallback(
@@ -255,8 +264,10 @@ export default function AdminPage() {
   const login = async () => {
     const ok = await load(key);
     setAuthed(ok);
-    setMsg(ok ? "" : t("admin.invalidKey"));
-    if (ok) sessionStorage.setItem("admin-key", key);
+    if (ok) {
+      setMsg("");
+      sessionStorage.setItem("admin-key", key);
+    }
   };
 
   const act = async (id: number, action: string) => {
