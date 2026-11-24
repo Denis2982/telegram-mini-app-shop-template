@@ -222,11 +222,21 @@ export default function AdminPage() {
       setMsg(t("admin.categoryHasProducts"));
       return;
     }
+    if (categoryRows.some((row) => row.parentId === category.id)) {
+      setMsg(t("admin.categoryHasSubcategories"));
+      return;
+    }
     if (!window.confirm(t("admin.deleteCategoryConfirm", { name: category.name }))) return;
     const response = await call(`/api/admin/categories/${category.id}`, { method: "DELETE" });
     if (!response.ok) {
       const data = await response.json().catch(() => ({ error: t("admin.categoryDeleteError") }));
-      setMsg(data.error ?? t("admin.categoryDeleteError"));
+      setMsg(
+        data.error === "Category contains subcategories"
+          ? t("admin.categoryHasSubcategories")
+          : data.error === "Category contains products"
+            ? t("admin.categoryHasProducts")
+            : data.error ?? t("admin.categoryDeleteError"),
+      );
       return;
     }
     setMsg(t("admin.categoryDeleted"));
@@ -444,7 +454,9 @@ export default function AdminPage() {
   );
 
   return (
-    <main className="mx-auto max-w-5xl space-y-4 p-4 text-slate-900">
+    <main
+      className={`mx-auto ${tab === "products" ? "max-w-7xl" : "max-w-5xl"} space-y-4 p-4 text-slate-900`}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-3 text-xl font-bold">{t("admin.panelTitle")}</h1>
         {tabBtn("orders", `${t("admin.orders")} (${orders.length})`)}
@@ -562,24 +574,34 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {categoryRows.map((category) => (
-                    <tr key={category.id} className="border-t border-slate-100">
-                      <td className="p-3 font-medium">{category.name}</td>
-                      <td className="p-3">{category.productCount}</td>
-                      <td className="p-3">
-                        <div className="flex flex-wrap gap-2">
-                          <Btn onClick={() => void renameCategory(category)}>{t("admin.edit")}</Btn>
-                          <Btn
-                            danger
-                            disabled={category.productCount > 0}
-                            onClick={() => void deleteCategory(category)}
-                          >
-                            {t("admin.delete")}
-                          </Btn>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {categoryRows.map((category) => {
+                    const hasSubcategories = categoryRows.some((row) => row.parentId === category.id);
+                    return (
+                      <tr key={category.id} className="border-t border-slate-100">
+                        <td className="p-3 font-medium">
+                          {category.name}
+                          {hasSubcategories && (
+                            <p className="mt-1 text-xs font-normal text-amber-700">
+                              {t("admin.categoryHasSubcategories")}
+                            </p>
+                          )}
+                        </td>
+                        <td className="p-3">{category.productCount}</td>
+                        <td className="p-3">
+                          <div className="flex flex-wrap gap-2">
+                            <Btn onClick={() => void renameCategory(category)}>{t("admin.edit")}</Btn>
+                            <Btn
+                              danger
+                              disabled={category.productCount > 0 || hasSubcategories}
+                              onClick={() => void deleteCategory(category)}
+                            >
+                              {t("admin.delete")}
+                            </Btn>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

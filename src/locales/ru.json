@@ -220,6 +220,7 @@
   "admin.categoryDeleted": "Категория удалена",
   "admin.categoryDeleteError": "Не удалось удалить категорию",
   "admin.categoryHasProducts": "Категорию нельзя удалить, пока в ней есть товары",
+  "admin.categoryHasSubcategories": "Категорию нельзя удалить, пока у неё есть подкатегории",
   "admin.deleteCategoryConfirm": "Удалить категорию «{name}»?",
   "admin.deleteProductConfirm": "Удалить товар «{name}»?",
   "admin.productDeleted": "Товар удалён",

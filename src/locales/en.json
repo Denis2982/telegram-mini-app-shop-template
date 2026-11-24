@@ -220,6 +220,7 @@
   "admin.categoryDeleted": "Category deleted",
   "admin.categoryDeleteError": "Could not delete category",
   "admin.categoryHasProducts": "A category cannot be deleted while it contains products",
+  "admin.categoryHasSubcategories": "A category cannot be deleted while it has subcategories",
   "admin.deleteCategoryConfirm": "Delete category \"{name}\"?",
   "admin.deleteProductConfirm": "Delete product \"{name}\"?",
   "admin.productDeleted": "Product deleted",
