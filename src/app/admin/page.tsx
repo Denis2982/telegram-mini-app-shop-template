@@ -33,6 +33,8 @@ export default function AdminPage() {
   const [promosLoading, setPromosLoading] = useState(false);
   const [editingPromoCode, setEditingPromoCode] = useState<string | null>(null);
   const [editingVariantProduct, setEditingVariantProduct] = useState<ProductDto | null>(null);
+  const [createProductOpen, setCreateProductOpen] = useState(false);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [promoForm, setPromoForm] = useState({
     code: "",
     discountType: "percent" as PromoDiscountType,
@@ -44,6 +46,7 @@ export default function AdminPage() {
     void api.config(getWebApp()?.initDataUnsafe?.user?.language_code)
       .then((config) => setDict(config.dict))
       .catch(() => setDict({}));
+    void api.categories().then(setCategories).catch(() => setCategories([]));
   }, []);
 
   const call = useCallback(
@@ -410,7 +413,11 @@ export default function AdminPage() {
       )}
 
       {tab === "products" && (
-        <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Btn onClick={() => setCreateProductOpen(true)}>{t("admin.addProduct")}</Btn>
+          </div>
+          <div className="overflow-x-auto rounded-2xl bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-500">
               <tr><th className="p-3">{t("admin.productSku")}</th><th className="p-3">{t("admin.productPhoto")}</th><th className="p-3">{t("admin.productName")}</th><th className="p-3">{t("admin.productCategory")}</th><th className="p-3">{t("admin.productPrice")}</th><th className="p-3">{t("admin.productStock")}</th><th className="p-3">{t("admin.productActive")}</th></tr>
@@ -455,6 +462,7 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -682,7 +690,233 @@ export default function AdminPage() {
           }}
         />
       )}
+      {createProductOpen && (
+        <CreateProductModal
+          categories={categories}
+          t={t}
+          onClose={() => setCreateProductOpen(false)}
+          onUpload={async (file) => {
+            const formData = new FormData();
+            formData.append("file", file);
+            const response = await call("/api/admin/upload", { method: "POST", body: formData });
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({ error: t("admin.photoUploadError") }));
+              throw new Error(data.error ?? t("admin.photoUploadError"));
+            }
+            const data = await response.json() as { url: string };
+            return data.url;
+          }}
+          onSave={async (input) => {
+            const response = await call("/api/admin/products", {
+              method: "POST",
+              body: JSON.stringify(input),
+            });
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({ error: t("admin.productCreateError") }));
+              throw new Error(data.error ?? t("admin.productCreateError"));
+            }
+            setCreateProductOpen(false);
+            await load();
+            setMsg(t("admin.productCreated"));
+          }}
+        />
+      )}
     </main>
+  );
+}
+
+function CreateProductModal({
+  categories,
+  t,
+  onClose,
+  onUpload,
+  onSave,
+}: {
+  categories: { id: number; name: string }[];
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  onClose: () => void;
+  onUpload: (file: File) => Promise<string>;
+  onSave: (input: {
+    sku: string;
+    name: string;
+    description: string;
+    price: number;
+    stock: number;
+    active: boolean;
+    images: string[];
+    categoryId: number | null;
+    newCategoryName?: string;
+    variants: { name: string; sku?: string; stock: number; price?: number }[];
+  }) => Promise<void>;
+}) {
+  const [form, setForm] = useState({
+    sku: "",
+    name: "",
+    description: "",
+    price: "",
+    stock: "0",
+    active: true,
+    categoryId: "",
+    newCategoryName: "",
+  });
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState([{ name: "", sku: "", stock: "0", price: "" }]);
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const totalVariantStock = variants.reduce((sum, variant) => sum + (Math.max(0, Math.floor(Number(variant.stock) || 0))), 0);
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    setError("");
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files).slice(0, Math.max(0, 20 - images.length))) {
+        uploaded.push(await onUpload(file));
+      }
+      setImages((current) => [...current, ...uploaded].slice(0, 20));
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : t("admin.photoUploadError"));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = async () => {
+    const price = Number(form.price);
+    if (!form.name.trim() || !form.sku.trim() || !Number.isFinite(price) || price < 0) {
+      setError(t("admin.requiredProductFields"));
+      return;
+    }
+    if (hasVariants && variants.some((variant) => !variant.name.trim())) {
+      setError(t("admin.variantName"));
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({
+        sku: form.sku.trim(),
+        name: form.name.trim(),
+        description: form.description.trim(),
+        price,
+        stock: hasVariants ? totalVariantStock : Math.max(0, Math.floor(Number(form.stock) || 0)),
+        active: form.active,
+        images,
+        categoryId: form.categoryId ? Number(form.categoryId) : null,
+        newCategoryName: form.categoryId ? undefined : form.newCategoryName,
+        variants: hasVariants
+          ? variants.map((variant) => ({
+              name: variant.name.trim(),
+              sku: variant.sku.trim() || undefined,
+              stock: Math.max(0, Math.floor(Number(variant.stock) || 0)),
+              price: variant.price === "" ? undefined : Number(variant.price),
+            }))
+          : [],
+      });
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t("admin.productCreateError"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputClass = "w-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm outline-none";
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="my-4 w-full max-w-2xl space-y-4 rounded-2xl bg-white p-5 shadow-xl">
+        <h2 className="text-lg font-semibold">{t("admin.createProduct")}</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-sm font-medium">{t("admin.productNameField")}</span>
+            <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className={inputClass} />
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium">{t("admin.productSkuField")}</span>
+            <input value={form.sku} onChange={(event) => setForm({ ...form, sku: event.target.value })} className={`${inputClass} font-mono`} />
+          </label>
+        </div>
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">{t("admin.productDescription")}</span>
+          <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} className={inputClass} />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1">
+            <span className="text-sm font-medium">{t("admin.productCategoryField")}</span>
+            <select value={form.categoryId} onChange={(event) => setForm({ ...form, categoryId: event.target.value })} className={inputClass}>
+              <option value="">{t("admin.newCategory")}</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          {!form.categoryId && (
+            <label className="space-y-1">
+              <span className="text-sm font-medium">{t("admin.newCategoryName")}</span>
+              <input value={form.newCategoryName} onChange={(event) => setForm({ ...form, newCategoryName: event.target.value })} className={inputClass} />
+            </label>
+          )}
+          <label className="space-y-1">
+            <span className="text-sm font-medium">{t("admin.productPriceField")}</span>
+            <input type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} className={inputClass} />
+          </label>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-slate-100 px-3 py-2.5 text-sm">
+          <input type="checkbox" checked={hasVariants} onChange={(event) => setHasVariants(event.target.checked)} />
+          {t("admin.productHasVariants")}
+        </label>
+        {hasVariants ? (
+          <div className="space-y-2">
+            {variants.map((variant, index) => (
+              <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_100px_100px_auto]">
+                <input placeholder={t("admin.variantName")} value={variant.name} onChange={(event) => setVariants((current) => current.map((item, i) => i === index ? { ...item, name: event.target.value } : item))} className={inputClass} />
+                <input placeholder={t("admin.variantSku")} value={variant.sku} onChange={(event) => setVariants((current) => current.map((item, i) => i === index ? { ...item, sku: event.target.value } : item))} className={`${inputClass} font-mono`} />
+                <input type="number" min="0" step="1" aria-label={t("admin.variantStock")} value={variant.stock} onChange={(event) => setVariants((current) => current.map((item, i) => i === index ? { ...item, stock: event.target.value } : item))} className={inputClass} />
+                <input type="number" min="0" step="0.01" aria-label={t("admin.productPriceField")} value={variant.price} placeholder={t("admin.productPriceField")} onChange={(event) => setVariants((current) => current.map((item, i) => i === index ? { ...item, price: event.target.value } : item))} className={inputClass} />
+                <Btn danger disabled={variants.length === 1} onClick={() => setVariants((current) => current.filter((_, i) => i !== index))}>{t("admin.removeVariant")}</Btn>
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Btn onClick={() => setVariants((current) => [...current, { name: "", sku: "", stock: "0", price: "" }])}>{t("admin.addVariant")}</Btn>
+              <span className="text-sm text-slate-600">{t("admin.totalVariantStock")}: <b>{totalVariantStock}</b></span>
+            </div>
+          </div>
+        ) : (
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">{t("admin.productStockField")}</span>
+            <input type="number" min="0" step="1" value={form.stock} onChange={(event) => setForm({ ...form, stock: event.target.value })} className={`${inputClass} max-w-32`} />
+          </label>
+        )}
+        <div className="space-y-2">
+          <span className="text-sm font-medium">{t("admin.productImages")}</span>
+          <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={(event) => void uploadFiles(event.currentTarget.files)} className="block w-full text-sm" />
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {images.map((image) => (
+                <div key={image} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image} alt="" className="h-16 w-16 rounded-lg bg-slate-100 object-cover" />
+                  <button type="button" onClick={() => setImages((current) => current.filter((url) => url !== image))} className="absolute right-0 top-0 grid h-5 w-5 -translate-y-1/3 translate-x-1/3 place-items-center rounded-full bg-red-600 text-xs text-white">×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Btn onClick={onClose} disabled={saving || uploading}>{t("admin.cancel")}</Btn>
+          <Btn onClick={() => void save()} disabled={saving || uploading}>{saving ? t("admin.saving") : t("admin.createProduct")}</Btn>
+        </div>
+      </div>
+    </div>
   );
 }
 

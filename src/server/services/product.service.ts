@@ -103,6 +103,92 @@ export async function getProduct(id: number): Promise<ProductDto | null> {
   return (await hydrate([row]))[0];
 }
 
+function slugify(value: string) {
+  const map: Record<string, string> = {
+    а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ё:"e",ж:"zh",з:"z",и:"i",й:"y",к:"k",л:"l",м:"m",
+    н:"n",о:"o",п:"p",р:"r",с:"s",т:"t",у:"u",ф:"f",х:"h",ц:"ts",ч:"ch",ш:"sh",щ:"sch",ъ:"",
+    ы:"y",ь:"",э:"e",ю:"yu",я:"ya",
+  };
+  return value
+    .toLowerCase()
+    .trim()
+    .split("")
+    .map((char) => map[char] ?? char)
+    .join("")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+export async function createProductAdmin(input: {
+  sku: string;
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+  active: boolean;
+  images: string[];
+  categoryId: number | null;
+  newCategoryName?: string;
+  variants: { name: string; sku?: string; stock: number; price?: number }[];
+}) {
+  return db.transaction(async (tx) => {
+    let categoryId = input.categoryId;
+    if (input.newCategoryName?.trim()) {
+      const name = input.newCategoryName.trim();
+      const [existing] = await tx.select().from(categories).where(eq(categories.name, name)).limit(1);
+      if (existing) {
+        categoryId = existing.id;
+      } else {
+        const baseSlug = slugify(name) || `category-${Date.now()}`;
+        let slug = baseSlug;
+        let suffix = 2;
+        while (await tx.select({ id: categories.id }).from(categories).where(eq(categories.slug, slug)).limit(1).then((rows) => rows.length)) {
+          slug = `${baseSlug}-${suffix++}`;
+        }
+        const [created] = await tx.insert(categories).values({ name, slug }).returning();
+        categoryId = created.id;
+      }
+    }
+
+    const totalStock = input.variants.length
+      ? input.variants.reduce((sum, variant) => sum + variant.stock, 0)
+      : input.stock;
+
+    let created;
+    try {
+      [created] = await tx.insert(products).values({
+        sku: input.sku,
+        name: input.name,
+        description: input.description,
+        categoryId,
+        price: input.price,
+        images: input.images,
+        stock: totalStock,
+        active: input.active,
+      }).returning();
+    } catch (error) {
+      const code = (error as { cause?: { code?: string } }).cause?.code
+        ?? (error as { code?: string }).code;
+      if (code === "23505") throw new HttpError("A product with this SKU already exists", 409);
+      throw error;
+    }
+
+    if (input.variants.length) {
+      await tx.insert(productVariants).values(
+        input.variants.map((variant) => ({
+          productId: created.id,
+          name: variant.name,
+          sku: variant.sku?.trim() || null,
+          stock: variant.stock,
+          price: variant.price ?? null,
+        })),
+      );
+    }
+    return created.id;
+  });
+}
+
 export async function updateProductAdmin(
   id: number,
   patch: {
