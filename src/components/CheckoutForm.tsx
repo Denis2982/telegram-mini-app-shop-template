@@ -102,7 +102,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
       onCreated(res.order, res.payment);
     } catch (e) {
       haptic.error();
-      setError(e instanceof Error ? e.message : t("checkout.errorGeneric"));
+      setError(e instanceof Error && e.message === "Unauthorized" ? t("checkout.authRequired") : e instanceof Error ? e.message : t("checkout.errorGeneric"));
     } finally {
       setBusy(false);
     }

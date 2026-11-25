@@ -30,6 +30,7 @@
   "cart.remove": "Remove",
   "cart.items": "Items",
   "checkout.title": "Checkout",
+  "checkout.authRequired": "Open the shop in Telegram Mini App to place an order.",
   "checkout.name": "Full name",
   "checkout.phone": "Phone",
   "checkout.requestPhone": "Request from Telegram",

@@ -30,6 +30,7 @@
   "cart.remove": "Видалити",
   "cart.items": "Товари",
   "checkout.title": "Оформлення замовлення",
+  "checkout.authRequired": "Щоб оформити замовлення, відкрийте магазин у Telegram Mini App.",
   "checkout.name": "Ім’я та прізвище",
   "checkout.phone": "Телефон",
   "checkout.requestPhone": "Запросити з Telegram",
