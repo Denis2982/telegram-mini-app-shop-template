@@ -475,7 +475,7 @@ export default function AdminPage() {
 
   return (
     <main
-      className={`mx-auto ${tab === "products" ? "max-w-7xl" : "max-w-5xl"} space-y-4 p-4 text-slate-900`}
+      className="mx-auto max-w-7xl space-y-4 p-4 text-slate-900"
     >
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-3 text-xl font-bold">{t("admin.panelTitle")}</h1>
