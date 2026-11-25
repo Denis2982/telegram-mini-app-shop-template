@@ -14,6 +14,9 @@ const inputCls = "w-full rounded-xl bg-tg-secondary px-4 py-3 text-[15px] outlin
 export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payment: PaymentInstruction) => void }) {
   const { t, money } = useT();
   const config = useShopStore((s) => s.config)!;
+  const deliveryMethods = config.delivery.pickupPoints.length
+    ? DELIVERY
+    : DELIVERY.filter((method) => method !== "pickup");
   const lines = useCartStore((s) => s.lines);
   const clear = useCartStore((s) => s.clear);
   const subtotal = cartSubtotal(lines);
@@ -127,7 +130,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
 
       <Section title={t("checkout.delivery")}>
         <div className="flex gap-2">
-          {DELIVERY.map((d) => (
+          {deliveryMethods.map((d) => (
             <button key={d} onClick={() => setDelivery(d)} className={radio(delivery === d)}>
               {t(`delivery.${d}`)}
             </button>

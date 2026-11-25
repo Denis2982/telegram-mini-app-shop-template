@@ -15,7 +15,6 @@ export const PUT = withAdmin(async (req) => {
     typeof input.manualDetails !== "string" ||
     input.manualDetails.length > 5000 ||
     !Array.isArray(pickupPoints) ||
-    pickupPoints.length === 0 ||
     pickupPoints.length > 30 ||
     !pickupPoints.every((point): point is string => typeof point === "string" && point.trim().length > 0 && point.length <= 250) ||
     typeof input.currencyCode !== "string" ||

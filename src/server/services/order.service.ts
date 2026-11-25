@@ -134,6 +134,9 @@ export async function createOrder(user: DbUser, input: CreateOrderInput) {
   const phone = (input.phone ?? "").trim().slice(0, 40);
   const address = (input.address ?? "").trim().slice(0, 500);
   if (!name || !phone || !address) throw new HttpError("Name, phone and address are required");
+  if (input.deliveryMethod === "pickup" && !cfg.pickupPoints.includes(address)) {
+    throw new HttpError("Selected pickup point is unavailable");
+  }
   if (!Array.isArray(input.items) || input.items.length === 0) throw new HttpError("Cart is empty");
 
   // merge duplicated lines

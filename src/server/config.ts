@@ -70,7 +70,10 @@ export function getConfig() {
     courierFee: num("DELIVERY_COURIER_FEE", 300),
     postFee: num("DELIVERY_POST_FEE", 200),
     freeDeliveryFrom: num("FREE_DELIVERY_FROM", 5000),
-    pickupPoints: list("PICKUP_POINTS", ["ул. Тверская, 1 (10:00–21:00)", "ТЦ «Галерея», 2 этаж (10:00–22:00)"]),
+    pickupPoints: list(
+      "PICKUP_POINTS",
+      isProduction ? [] : ["ул. Тверская, 1 (10:00–21:00)", "ТЦ «Галерея», 2 этаж (10:00–22:00)"],
+    ),
   };
 }
 
