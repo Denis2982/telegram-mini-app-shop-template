@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ProductImageFallback } from "@/components/ProductImageFallback";
 import { haptic } from "@/hooks/useTelegram";
 import { useCartStore } from "@/store/useCartStore";
 import { useT } from "@/store/useShopStore";
@@ -8,9 +10,11 @@ import type { ProductDto } from "@/types";
 export function ProductCard({ product, onOpen }: { product: ProductDto; onOpen: (p: ProductDto) => void }) {
   const { t, money } = useT();
   const add = useCartStore((s) => s.add);
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const hasVariants = product.variants.length > 0;
   const prices = product.variants.map((v) => v.price);
   const ranged = hasVariants && Math.min(...prices) !== Math.max(...prices);
+  const imageUrl = product.images[0] ?? "";
 
   const onAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -22,9 +26,11 @@ export function ProductCard({ product, onOpen }: { product: ProductDto; onOpen: 
   return (
     <article onClick={() => onOpen(product)} className="flex cursor-pointer flex-col overflow-hidden rounded-2xl bg-tg-bg shadow-sm transition active:scale-[0.98]">
       <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-tg-secondary">
-        {product.images[0] && (
+        {imageUrl && failedImageUrl !== imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.images[0]} alt={product.name} loading="lazy" className={`absolute inset-0 h-full w-full object-cover ${product.inStock ? "" : "opacity-50 grayscale"}`} />
+          <img src={imageUrl} alt={product.name} loading="lazy" onError={() => setFailedImageUrl(imageUrl)} className={`absolute inset-0 h-full w-full object-cover ${product.inStock ? "" : "opacity-50 grayscale"}`} />
+        ) : (
+          <ProductImageFallback label={t("product.noImage")} className="absolute inset-0" />
         )}
         {!product.inStock && (
           <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-medium text-white">{t("product.outOfStock")}</span>

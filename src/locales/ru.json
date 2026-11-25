@@ -17,6 +17,7 @@
   "product.add": "В корзину",
   "product.addFor": "Добавить · {price}",
   "product.from": "от {price}",
+  "product.noImage": "Нет фото",
   "product.inStock": "В наличии",
   "product.lowStock": "Осталось {n} шт.",
   "product.outOfStock": "Нет в наличии",

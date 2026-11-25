@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MainAction } from "@/components/MainAction";
+import { ProductImageFallback } from "@/components/ProductImageFallback";
 import { haptic } from "@/hooks/useTelegram";
 import { useCartStore } from "@/store/useCartStore";
 import { useT } from "@/store/useShopStore";
@@ -14,6 +15,7 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
   const [variantId, setVariantId] = useState<number | null>(firstAvailable?.id ?? null);
   const [qty, setQty] = useState(1);
   const [slide, setSlide] = useState(0);
+  const [failedImages, setFailedImages] = useState<string[]>([]);
   const gallery = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
           ✕
         </button>
 
-        {product.images.length > 0 && (
+        {product.images.length > 0 ? (
           <div className="relative">
             <div
               ref={gallery}
@@ -52,8 +54,12 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
               className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
             >
               {product.images.map((src, i) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={src} alt={product.name} className="aspect-square w-full shrink-0 snap-center object-cover" />
+                failedImages.includes(src) ? (
+                  <ProductImageFallback key={i} label={t("product.noImage")} className="aspect-square w-full shrink-0 snap-center" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={src} alt={product.name} onError={() => setFailedImages((current) => current.includes(src) ? current : [...current, src])} className="aspect-square w-full shrink-0 snap-center object-cover" />
+                )
               ))}
             </div>
             {product.images.length > 1 && (
@@ -64,6 +70,8 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
               </div>
             )}
           </div>
+        ) : (
+          <ProductImageFallback label={t("product.noImage")} className="aspect-square w-full" />
         )}
 
         <div className="space-y-4 p-4">

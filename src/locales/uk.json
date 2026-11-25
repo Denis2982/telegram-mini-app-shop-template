@@ -17,6 +17,7 @@
   "product.add": "До кошика",
   "product.addFor": "Додати · {price}",
   "product.from": "від {price}",
+  "product.noImage": "Немає фото",
   "product.inStock": "Є в наявності",
   "product.lowStock": "Залишилося {n} шт.",
   "product.outOfStock": "Немає в наявності",

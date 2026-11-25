@@ -17,6 +17,7 @@
   "product.add": "Add to cart",
   "product.addFor": "Add · {price}",
   "product.from": "from {price}",
+  "product.noImage": "No photo",
   "product.inStock": "In stock",
   "product.lowStock": "Only {n} left",
   "product.outOfStock": "Out of stock",
