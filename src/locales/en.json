@@ -41,6 +41,8 @@
   "checkout.apply": "Apply",
   "checkout.promoApplied": "Promo code applied: −{discount}",
   "checkout.promoInvalid": "Invalid promo code",
+  "checkout.promoAuthRequired": "Open the shop in Telegram Mini App to check the promo code.",
+  "checkout.promoCheckFailed": "Could not check the promo code. Check your connection and try again.",
   "checkout.payment": "Payment method",
   "checkout.comment": "Order comment",
   "checkout.subtotal": "Items",

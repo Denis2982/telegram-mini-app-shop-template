@@ -28,7 +28,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
   const [comment, setComment] = useState("");
   const [promoInput, setPromoInput] = useState("");
   const [promo, setPromo] = useState<{ code: string; discount: number } | null>(null);
-  const [promoError, setPromoError] = useState(false);
+  const [promoError, setPromoError] = useState<"invalid" | "auth" | "request" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,7 +50,7 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
   const finalAddress = delivery === "pickup" ? pickup : address;
 
   const applyPromo = async () => {
-    setPromoError(false);
+    setPromoError(null);
     if (!promoInput.trim()) return;
     try {
       const r = await api.checkPromo(promoInput, subtotal);
@@ -59,11 +59,12 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
         haptic.success();
       } else {
         setPromo(null);
-        setPromoError(true);
+        setPromoError("invalid");
         haptic.error();
       }
-    } catch {
-      setPromoError(true);
+    } catch (error) {
+      setPromo(null);
+      setPromoError(error instanceof Error && error.message === "Unauthorized" ? "auth" : "request");
     }
   };
 
@@ -151,7 +152,11 @@ export function CheckoutForm({ onCreated }: { onCreated: (order: OrderDto, payme
           </button>
         </div>
         {promo && <p className="text-sm text-emerald-600">✓ {t("checkout.promoApplied", { discount: money(promo.discount) })}</p>}
-        {promoError && <p className="text-sm text-tg-destructive">{t("checkout.promoInvalid")}</p>}
+        {promoError && (
+          <p className="text-sm text-tg-destructive">
+            {t(promoError === "invalid" ? "checkout.promoInvalid" : promoError === "auth" ? "checkout.promoAuthRequired" : "checkout.promoCheckFailed")}
+          </p>
+        )}
       </Section>
 
       <Section title={t("checkout.payment")}>

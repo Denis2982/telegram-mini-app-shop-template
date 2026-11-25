@@ -38,8 +38,8 @@ export function ProductModal({ product, onClose }: { product: ProductDto; onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="sheet-up relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-tg-bg pb-28">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50">
+      <div className="sheet-up relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-t-3xl bg-tg-bg pb-28">
         <button onClick={onClose} aria-label={t("product.close")} className="absolute right-3 top-3 z-10 grid h-9 w-9 cursor-pointer place-items-center rounded-full bg-black/50 text-white transition hover:bg-black/70 active:scale-95">
           ✕
         </button>

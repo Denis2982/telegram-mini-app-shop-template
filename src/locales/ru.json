@@ -41,6 +41,8 @@
   "checkout.apply": "Применить",
   "checkout.promoApplied": "Промокод применён: −{discount}",
   "checkout.promoInvalid": "Промокод недействителен",
+  "checkout.promoAuthRequired": "Откройте магазин в Telegram Mini App, чтобы проверить промокод.",
+  "checkout.promoCheckFailed": "Не удалось проверить промокод. Проверьте соединение и попробуйте снова.",
   "checkout.payment": "Способ оплаты",
   "checkout.comment": "Комментарий к заказу",
   "checkout.subtotal": "Товары",
