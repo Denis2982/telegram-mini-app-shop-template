@@ -997,9 +997,6 @@ function CreateProductModal({
       className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/40 p-4"
       role="dialog"
       aria-modal="true"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <div className="my-4 w-full max-w-2xl space-y-4 rounded-2xl bg-white p-5 shadow-xl">
         <h2 className="text-lg font-semibold">{t("admin.createProduct")}</h2>
