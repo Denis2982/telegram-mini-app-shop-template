@@ -199,13 +199,13 @@ export async function updateProductAdmin(
     price?: number;
     active?: boolean;
     images?: string[];
-    variants?: { id: number; stock: number }[];
+    variants?: { id: number; stock: number; price?: number }[];
   },
 ) {
   if (patch.variants) {
     await db.transaction(async (tx) => {
       const existing = await tx
-        .select({ id: productVariants.id })
+        .select({ id: productVariants.id, price: productVariants.price })
         .from(productVariants)
         .where(eq(productVariants.productId, id));
       const existingIds = new Set(existing.map((variant) => variant.id));
@@ -221,14 +221,28 @@ export async function updateProductAdmin(
       for (const variant of patch.variants!) {
         await tx
           .update(productVariants)
-          .set({ stock: variant.stock })
+          .set({
+            stock: variant.stock,
+            ...(variant.price === undefined ? {} : { price: variant.price }),
+          })
           .where(and(eq(productVariants.id, variant.id), eq(productVariants.productId, id)));
       }
 
       const totalStock = patch.variants!.reduce((sum, variant) => sum + variant.stock, 0);
+      const productRow = await tx
+        .select({ price: products.price })
+        .from(products)
+        .where(eq(products.id, id))
+        .limit(1);
+      const fallbackPrice = productRow[0]?.price ?? 0;
+      const effectivePrices = patch.variants!.map((variant) => {
+        if (variant.price !== undefined) return variant.price;
+        return existing.find((item) => item.id === variant.id)?.price ?? fallbackPrice;
+      });
+      const lowestPrice = Math.min(...effectivePrices);
       await tx
         .update(products)
-        .set({ stock: totalStock, updatedAt: new Date() })
+        .set({ stock: totalStock, price: lowestPrice, updatedAt: new Date() })
         .where(eq(products.id, id));
     });
   }

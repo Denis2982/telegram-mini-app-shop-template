@@ -18,7 +18,7 @@ export const PATCH = withAdmin<{ params: Promise<{ id: string }> }>(async (req, 
     price?: number;
     active?: boolean;
     images?: string[];
-    variants?: { id: number; stock: number }[];
+    variants?: { id: number; stock: number; price?: number }[];
   } = {
     stock: body.stock,
     price: body.price,
@@ -37,14 +37,21 @@ export const PATCH = withAdmin<{ params: Promise<{ id: string }> }>(async (req, 
         Number.isInteger((variant as { id?: unknown }).id) &&
         Number((variant as { id: number }).id) > 0 &&
         Number.isFinite((variant as { stock?: unknown }).stock) &&
-        Number((variant as { stock: number }).stock) >= 0,
+        Number((variant as { stock: number }).stock) >= 0 &&
+        ((variant as { price?: unknown }).price === undefined ||
+          (Number.isFinite((variant as { price?: unknown }).price) &&
+            Number((variant as { price: number }).price) >= 0)),
       )
     ) {
-      return fail("Invalid variant stock");
+      return fail("Invalid variant price or stock");
     }
     patch.variants = body.variants.map((variant) => {
-      const item = variant as { id: number; stock: number };
-      return { id: item.id, stock: Math.max(0, Math.floor(item.stock)) };
+      const item = variant as { id: number; stock: number; price?: number };
+      return {
+        id: item.id,
+        stock: Math.max(0, Math.floor(item.stock)),
+        ...(item.price === undefined ? {} : { price: item.price }),
+      };
     });
   }
   if (body.images !== undefined) {

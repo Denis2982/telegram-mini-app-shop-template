@@ -546,7 +546,16 @@ export default function AdminPage() {
                   </td>
                   <td className="p-3">{p.name}</td>
                   <td className="p-3">{p.categoryName ?? "—"}</td>
-                  <td className="p-3"><NumInput key={`price-${p.id}-${p.price}`} value={p.price} onSave={(v) => patch(p.id, { price: v })} /></td>
+                  <td className="p-3">
+                    {p.variants.length ? (
+                      <div>
+                        <span>{p.price}</span>
+                        <div className="text-xs text-slate-400">{t("admin.variantPriceDisplay")}</div>
+                      </div>
+                    ) : (
+                      <NumInput key={`price-${p.id}-${p.price}`} value={p.price} onSave={(v) => patch(p.id, { price: v })} />
+                    )}
+                  </td>
                   <td className="p-3">
                     {p.variants.length ? (
                       <div className="flex items-center gap-2">
@@ -848,12 +857,12 @@ export default function AdminPage() {
               { method: "PATCH", body: JSON.stringify({ variants }) },
             );
             if (!response.ok) {
-              const data = await response.json().catch(() => ({ error: t("admin.variantStockError") }));
-              throw new Error(data.error ?? t("admin.variantStockError"));
+              const data = await response.json().catch(() => ({ error: t("admin.variantEditError") }));
+              throw new Error(data.error ?? t("admin.variantEditError"));
             }
             setEditingVariantProduct(null);
             await load();
-            setMsg(t("admin.variantStockSaved"));
+            setMsg(t("admin.variantEditSaved"));
           }}
         />
       )}
@@ -1093,25 +1102,37 @@ function VariantStockModal({
   product: ProductDto;
   t: (key: string, vars?: Record<string, string | number>) => string;
   onClose: () => void;
-  onSave: (variants: { id: number; stock: number }[]) => Promise<void>;
+  onSave: (variants: { id: number; stock: number; price: number }[]) => Promise<void>;
 }) {
   const [stocks, setStocks] = useState<Record<number, string>>(
     Object.fromEntries(product.variants.map((variant) => [variant.id, String(variant.stock)])),
+  );
+  const [prices, setPrices] = useState<Record<number, string>>(
+    Object.fromEntries(product.variants.map((variant) => [variant.id, String(variant.price)])),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const save = async () => {
+    const invalidPrice = product.variants.some((variant) => {
+      const value = prices[variant.id]?.trim() ?? "";
+      return value === "" || !Number.isFinite(Number(value)) || Number(value) < 0;
+    });
+    if (invalidPrice) {
+      setError(t("admin.variantInvalidPrice"));
+      return;
+    }
     const variants = product.variants.map((variant) => ({
       id: variant.id,
       stock: Math.max(0, Math.floor(Number(stocks[variant.id]) || 0)),
+      price: Number(prices[variant.id]),
     }));
     setSaving(true);
     setError("");
     try {
       await onSave(variants);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : t("admin.variantStockError"));
+      setError(saveError instanceof Error ? saveError.message : t("admin.variantEditError"));
     } finally {
       setSaving(false);
     }
@@ -1128,30 +1149,45 @@ function VariantStockModal({
     >
       <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-xl">
         <div>
-          <h2 className="font-semibold">{t("admin.variantStockTitle")}</h2>
+          <h2 className="font-semibold">{t("admin.variantEditTitle")}</h2>
           <p className="mt-1 text-sm text-slate-500">{product.name}</p>
-          <p className="mt-1 text-xs text-slate-500">{t("admin.variantStockHint")}</p>
+          <p className="mt-1 text-xs text-slate-500">{t("admin.variantEditHint")}</p>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_7rem_7rem] gap-2 px-1 text-xs font-medium text-slate-500">
+          <span>{t("admin.variantName")}</span>
+          <span>{t("admin.variantPrice")}</span>
+          <span>{t("admin.productStock")}</span>
         </div>
         <div className="space-y-2">
           {product.variants.map((variant) => (
-            <label key={variant.id} className="flex items-center justify-between gap-4 rounded-xl bg-slate-100 px-3 py-2">
+            <div key={variant.id} className="grid grid-cols-[minmax(0,1fr)_7rem_7rem] items-center gap-2 rounded-xl bg-slate-100 px-3 py-2">
               <span className="text-sm font-medium">{variant.name}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={prices[variant.id] ?? ""}
+                aria-label={t("admin.variantPriceFor", { name: variant.name })}
+                onChange={(event) => setPrices((current) => ({ ...current, [variant.id]: event.target.value }))}
+                className="w-full rounded-lg bg-white px-3 py-2 text-sm outline-none"
+              />
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={stocks[variant.id] ?? "0"}
+                aria-label={t("admin.variantStockFor", { name: variant.name })}
                 onChange={(event) => setStocks((current) => ({ ...current, [variant.id]: event.target.value }))}
                 className="w-24 rounded-lg bg-white px-3 py-2 text-sm outline-none"
               />
-            </label>
+            </div>
           ))}
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex justify-end gap-2">
           <Btn onClick={onClose} disabled={saving}>{t("admin.cancel")}</Btn>
           <Btn onClick={() => void save()} disabled={saving}>
-            {saving ? t("admin.saving") : t("admin.variantStockSave")}
+            {saving ? t("admin.saving") : t("admin.variantEditSave")}
           </Btn>
         </div>
       </div>
