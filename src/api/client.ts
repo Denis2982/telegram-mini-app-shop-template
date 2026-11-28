@@ -20,7 +20,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  config: (lang?: string) => request<ClientConfig>(`/api/config${lang ? `?lang=${lang}` : ""}`),
+  config: () => request<ClientConfig>("/api/config"),
   categories: () => request<CategoryDto[]>("/api/categories"),
   products: (qs: URLSearchParams) => request<ProductDto[]>(`/api/products?${qs.toString()}`),
   checkPromo: (code: string, subtotal: number) =>

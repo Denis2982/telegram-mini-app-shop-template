@@ -1,4 +1,4 @@
-import { availablePaymentMethods, pickLocale } from "@/server/config";
+import { availablePaymentMethods } from "@/server/config";
 import { getDict } from "@/server/locale";
 import { json, safe } from "@/server/http";
 import { getEffectiveConfig } from "@/server/services/store-settings.service";
@@ -6,10 +6,9 @@ import type { ClientConfig, PaymentMethod } from "@/types";
 
 export const dynamic = "force-dynamic";
 
-export const GET = safe(async (req) => {
+export const GET = safe(async () => {
   const cfg = await getEffectiveConfig();
-  const lang = new URL(req.url).searchParams.get("lang");
-  const locale = lang ? pickLocale(lang) : cfg.defaultLocale;
+  const locale = cfg.defaultLocale;
   const body: ClientConfig = {
     storeName: cfg.storeName,
     currencyCode: cfg.currencyCode,

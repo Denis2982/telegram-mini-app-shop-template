@@ -15,7 +15,7 @@ interface ShopState {
   loading: boolean;
   error: string | null;
   filters: { categoryId: number | null; q: string; min: string; max: string; sort: SortKey };
-  init: (lang?: string) => Promise<void>;
+  init: () => Promise<void>;
   setFilters: (patch: Partial<ShopState["filters"]>) => void;
   resetFilters: () => void;
   loadProducts: () => Promise<void>;
@@ -32,9 +32,9 @@ export const useShopStore = create<ShopState>((set, get) => ({
   error: null,
   filters: defaultFilters,
 
-  init: async (lang) => {
+  init: async () => {
     try {
-      const [config, categories] = await Promise.all([api.config(lang), api.categories()]);
+      const [config, categories] = await Promise.all([api.config(), api.categories()]);
       set({ config, categories });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : "error", loading: false });

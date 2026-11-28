@@ -85,8 +85,8 @@ Mini App → `POST /api/orders` (цены пересчитываются, ост
 и [Bot Payments для физических товаров](https://core.telegram.org/bots/payments).
 Новый платёжный провайдер: реализуйте `IPaymentProvider` и добавьте в
 `src/server/services/payment/index.ts`. Поддерживаемые языки интерфейса: русский, английский
-и украинский; язык Telegram определяется автоматически, а `DEFAULT_LOCALE` задаёт язык
-по умолчанию вне Telegram.
+и украинский; язык витрины и админки задаётся переменной `DEFAULT_LOCALE`. Язык сообщений
+бота определяется по языку пользователя Telegram.
 
 ## Импорт / экспорт
 `/admin` → «Импорт / экспорт»: колонки `SKU, Name, Category, Price, Stock, Image, Description`; обновление по артикулу.

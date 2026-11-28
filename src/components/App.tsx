@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getWebApp, initTelegram, useBackButton } from "@/hooks/useTelegram";
+import { initTelegram, useBackButton } from "@/hooks/useTelegram";
 import { useShopStore } from "@/store/useShopStore";
 import type { PaymentInstruction } from "@/types";
 import { CartPage } from "@/views/CartPage";
@@ -25,7 +25,7 @@ export function App() {
   useEffect(() => {
     initTelegram();
     
-    void init(getWebApp()?.initDataUnsafe?.user?.language_code);
+    void init();
   }, [init]);
 
   const push = useCallback((v: View) => setStack((s) => [...s, v]), []);

@@ -51,7 +51,7 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    void api.config(getWebApp()?.initDataUnsafe?.user?.language_code)
+    void api.config()
       .then((config) => {
         setDict(config.dict);
         setMoneyLocale({ locale: config.locale, currencySymbol: config.currencySymbol });
