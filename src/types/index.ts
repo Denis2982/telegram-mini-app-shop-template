@@ -93,6 +93,9 @@ export interface StoreSettingsDto {
   pickupPoints: string[];
   currencyCode: string;
   currencySymbol: string;
+  courierFee: number;
+  postFee: number;
+  freeDeliveryFrom: number;
 }
 
 export type PromoDiscountType = "percent" | "fixed";

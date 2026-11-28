@@ -139,6 +139,9 @@ export const storeSettings = pgTable("store_settings", {
   pickupPoints: text("pickup_points").array(),
   currencyCode: text("currency_code"),
   currencySymbol: text("currency_symbol"),
+  courierFee: money("courier_fee"),
+  postFee: money("post_fee"),
+  freeDeliveryFrom: money("free_delivery_from"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

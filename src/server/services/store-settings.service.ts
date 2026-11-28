@@ -14,6 +14,9 @@ export async function getStoreSettings(): Promise<StoreSettingsDto> {
     pickupPoints: saved?.pickupPoints ?? cfg.pickupPoints,
     currencyCode: saved?.currencyCode ?? cfg.currencyCode,
     currencySymbol: saved?.currencySymbol ?? cfg.currencySymbol,
+    courierFee: saved?.courierFee ?? cfg.courierFee,
+    postFee: saved?.postFee ?? cfg.postFee,
+    freeDeliveryFrom: saved?.freeDeliveryFrom ?? cfg.freeDeliveryFrom,
   };
 }
 
@@ -28,6 +31,9 @@ export async function saveStoreSettings(settings: StoreSettingsDto) {
     pickupPoints: settings.pickupPoints,
     currencyCode: settings.currencyCode,
     currencySymbol: settings.currencySymbol,
+    courierFee: settings.courierFee,
+    postFee: settings.postFee,
+    freeDeliveryFrom: settings.freeDeliveryFrom,
     updatedAt: new Date(),
   };
   await db
@@ -40,6 +46,9 @@ export async function saveStoreSettings(settings: StoreSettingsDto) {
         pickupPoints: values.pickupPoints,
         currencyCode: values.currencyCode,
         currencySymbol: values.currencySymbol,
+        courierFee: values.courierFee,
+        postFee: values.postFee,
+        freeDeliveryFrom: values.freeDeliveryFrom,
         updatedAt: values.updatedAt,
       },
     });

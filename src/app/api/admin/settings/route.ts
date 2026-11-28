@@ -11,6 +11,16 @@ export const PUT = withAdmin(async (req) => {
   if (!body || typeof body !== "object") return fail("Invalid settings");
   const input = body as Record<string, unknown>;
   const pickupPoints = input.pickupPoints;
+  const courierFee = input.courierFee;
+  const postFee = input.postFee;
+  const freeDeliveryFrom = input.freeDeliveryFrom;
+  const isValidAmount = (value: unknown): value is number =>
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 9_999_999_999.99 &&
+    Number(value.toFixed(2)) === value;
+
   if (
     typeof input.manualDetails !== "string" ||
     input.manualDetails.length > 5000 ||
@@ -21,7 +31,10 @@ export const PUT = withAdmin(async (req) => {
     !/^[a-z]{3}$/i.test(input.currencyCode.trim()) ||
     typeof input.currencySymbol !== "string" ||
     !input.currencySymbol.trim() ||
-    input.currencySymbol.trim().length > 8
+    input.currencySymbol.trim().length > 8 ||
+    !isValidAmount(courierFee) ||
+    !isValidAmount(postFee) ||
+    !isValidAmount(freeDeliveryFrom)
   ) {
     return fail("Invalid settings");
   }
@@ -31,6 +44,9 @@ export const PUT = withAdmin(async (req) => {
     pickupPoints: pickupPoints.map((point) => point.trim()),
     currencyCode: input.currencyCode.trim().toUpperCase(),
     currencySymbol: input.currencySymbol.trim(),
+    courierFee,
+    postFee,
+    freeDeliveryFrom,
   };
   await saveStoreSettings(settings);
   return json(await getStoreSettings());

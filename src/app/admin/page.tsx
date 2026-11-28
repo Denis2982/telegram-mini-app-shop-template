@@ -32,6 +32,9 @@ export default function AdminPage() {
     pickupPoints: "",
     currencyCode: "RUB",
     currencySymbol: "₽",
+    courierFee: "",
+    postFee: "",
+    freeDeliveryFrom: "",
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
@@ -134,6 +137,9 @@ export default function AdminPage() {
           pickupPoints: settings.pickupPoints.join("\n"),
           currencyCode: settings.currencyCode,
           currencySymbol: settings.currencySymbol,
+          courierFee: String(settings.courierFee),
+          postFee: String(settings.postFee),
+          freeDeliveryFrom: String(settings.freeDeliveryFrom),
         });
         setMsg("");
         return true;
@@ -290,6 +296,12 @@ export default function AdminPage() {
   };
 
   const saveStoreSettings = async () => {
+    const amounts = [settingsForm.courierFee, settingsForm.postFee, settingsForm.freeDeliveryFrom];
+    if (amounts.some((amount) => !amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) < 0)) {
+      setMsg(t("admin.deliveryFeesInvalid"));
+      return;
+    }
+
     setSettingsSaving(true);
     try {
       const response = await call("/api/admin/settings", {
@@ -299,6 +311,9 @@ export default function AdminPage() {
           pickupPoints: settingsForm.pickupPoints.split(/\r?\n/).map((point) => point.trim()).filter(Boolean),
           currencyCode: settingsForm.currencyCode,
           currencySymbol: settingsForm.currencySymbol,
+          courierFee: Number(settingsForm.courierFee),
+          postFee: Number(settingsForm.postFee),
+          freeDeliveryFrom: Number(settingsForm.freeDeliveryFrom),
         }),
       });
       const data = await response.json();
@@ -312,6 +327,9 @@ export default function AdminPage() {
         pickupPoints: saved.pickupPoints.join("\n"),
         currencyCode: saved.currencyCode,
         currencySymbol: saved.currencySymbol,
+        courierFee: String(saved.courierFee),
+        postFee: String(saved.postFee),
+        freeDeliveryFrom: String(saved.freeDeliveryFrom),
       });
       setMsg(t("admin.settingsSaved"));
     } catch (error) {
@@ -709,6 +727,47 @@ export default function AdminPage() {
               className="w-full resize-y rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
             />
           </label>
+          <div>
+            <p className="text-sm text-slate-500">{t("admin.deliveryFeesHint")}</p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <label className="space-y-1.5">
+                <span className="block text-sm font-medium">{t("admin.deliveryCourierFee")}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="9999999999.99"
+                  step="0.01"
+                  value={settingsForm.courierFee}
+                  onChange={(event) => setSettingsForm({ ...settingsForm, courierFee: event.target.value })}
+                  className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className="block text-sm font-medium">{t("admin.deliveryPostFee")}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="9999999999.99"
+                  step="0.01"
+                  value={settingsForm.postFee}
+                  onChange={(event) => setSettingsForm({ ...settingsForm, postFee: event.target.value })}
+                  className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className="block text-sm font-medium">{t("admin.freeDeliveryFrom")}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="9999999999.99"
+                  step="0.01"
+                  value={settingsForm.freeDeliveryFrom}
+                  onChange={(event) => setSettingsForm({ ...settingsForm, freeDeliveryFrom: event.target.value })}
+                  className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </label>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5">
               <span className="block text-sm font-medium">{t("admin.currencyCode")}</span>
