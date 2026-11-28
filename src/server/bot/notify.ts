@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, type DbOrder, type DbOrderItem, type DbUser } from "@/db/schema";
 import { formatMoney, getConfig } from "../config";
-import { tr, trDefault } from "../locale";
+import { trDefault } from "../locale";
 import { getEffectiveConfig } from "../services/store-settings.service";
 
 let api: Api | null = null;
@@ -114,9 +114,9 @@ export async function notifyBuyer(order: DbOrder, user: DbUser | null) {
     const cfg = await getEffectiveConfig();
     await a.sendMessage(
       user.tgId,
-      tr(user.languageCode, `bot.notify.${order.status}`, {
+      trDefault(`bot.notify.${order.status}`, {
         id: order.id,
-        total: formatMoney(order.total, cfg, user.languageCode ?? undefined),
+        total: formatMoney(order.total, cfg),
       }),
     );
   } catch (e) {

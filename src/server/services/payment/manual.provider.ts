@@ -1,7 +1,7 @@
 import type { PaymentInstruction } from "@/types";
 import { getApi } from "../../bot/notify";
 import { formatMoney, getConfig } from "../../config";
-import { tr } from "../../locale";
+import { trDefault } from "../../locale";
 import { getEffectiveConfig } from "../store-settings.service";
 import { esc } from "../../bot/notify";
 import type { IPaymentProvider, PaymentContext } from "./payment.interface";
@@ -22,9 +22,9 @@ export class ManualProvider implements IPaymentProvider {
       try {
         await api.sendMessage(
           user.tgId,
-          tr(user.languageCode, "bot.manualInstructions", {
+          trDefault("bot.manualInstructions", {
             id: order.id,
-            total: formatMoney(order.total, cfg, user.languageCode ?? undefined),
+            total: formatMoney(order.total, cfg),
             details: esc(details),
           }),
           { parse_mode: "HTML" },

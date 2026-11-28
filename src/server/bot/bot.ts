@@ -4,7 +4,7 @@ import { registerAdmin } from "./handlers/admin";
 import { registerOrders } from "./handlers/orders";
 import { registerPayments } from "./handlers/payments";
 import { registerStart } from "./handlers/start";
-import { tr } from "../locale";
+import { trDefault } from "../locale";
 
 let bot: Bot | null = null;
 let botToken = "";
@@ -31,13 +31,13 @@ export function getBot(): Bot | null {
     b.command("admin", async (ctx) => {
       const cfg = getConfig();
       if (!ctx.from || !cfg.adminIds.includes(ctx.from.id)) {
-        return ctx.reply(tr(ctx.from?.language_code, "bot.adminNoAccess"));
+        return ctx.reply(trDefault("bot.adminNoAccess"));
       }
 
       const adminUrl = `${cfg.miniAppUrl}/admin`;
-      await ctx.reply(`${tr(ctx.from?.language_code, "bot.adminPanelTitle")}\n\n${tr(ctx.from?.language_code, "bot.adminPanelHint")}`, {
+      await ctx.reply(`${trDefault("bot.adminPanelTitle")}\n\n${trDefault("bot.adminPanelHint")}`, {
         reply_markup: {
-          inline_keyboard: [[{ text: tr(ctx.from?.language_code, "bot.adminPanelButton"), url: adminUrl }]],
+          inline_keyboard: [[{ text: trDefault("bot.adminPanelButton"), url: adminUrl }]],
         },
       });
     });

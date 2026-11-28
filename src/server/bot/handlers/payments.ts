@@ -1,5 +1,5 @@
 import type { Bot } from "grammy";
-import { tr } from "../../locale";
+import { trDefault } from "../../locale";
 import { applyAction, validateTelegramPreCheckout } from "../../services/order.service";
 
 const parse = (payload: string) => {
@@ -16,7 +16,7 @@ export function registerPayments(bot: Bot) {
       currency: query.currency,
     });
     if (!accepted) {
-      return void (await ctx.answerPreCheckoutQuery(false, tr(ctx.from.language_code, "bot.preCheckoutFail")));
+      return void (await ctx.answerPreCheckoutQuery(false, trDefault("bot.preCheckoutFail")));
     }
     await ctx.answerPreCheckoutQuery(true);
   });
